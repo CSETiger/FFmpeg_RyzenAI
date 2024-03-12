@@ -34,8 +34,9 @@ static const AVOption options[] = {
     { "high_quality",           "high quality trancoding",                  0, AV_OPT_TYPE_CONST, {.i64 = AMF_VIDEO_ENCODER_HEVC_USAGE_HIGH_QUALITY              }, 0, 0, VE, .unit = "usage" },
     { "lowlatency_high_quality","low latency yet high quality trancoding",  0, AV_OPT_TYPE_CONST, {.i64 = AMF_VIDEO_ENCODER_HEVC_USAGE_LOW_LATENCY_HIGH_QUALITY  }, 0, 0, VE, .unit = "usage" },
 
-    { "profile",        "Set the profile (default main)",           OFFSET(profile),   AV_OPT_TYPE_INT,{ .i64 = AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN }, AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN, AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN, VE, .unit = "profile" },
+    { "profile",        "Set the profile (default main)",           OFFSET(profile),   AV_OPT_TYPE_INT,{ .i64 = AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN }, AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN, AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN_10, VE, .unit = "profile" },
     { "main",           "", 0,                      AV_OPT_TYPE_CONST,{ .i64 = AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN }, 0, 0, VE, .unit = "profile" },
+    { "main10",         "", 0,                      AV_OPT_TYPE_CONST,{ .i64 = AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN_10 }, 0, 0, VE, .unit = "profile" },
 
     { "profile_tier",   "Set the profile tier (default main)",      OFFSET(tier), AV_OPT_TYPE_INT,{ .i64 = AMF_VIDEO_ENCODER_HEVC_TIER_MAIN }, AMF_VIDEO_ENCODER_HEVC_TIER_MAIN, AMF_VIDEO_ENCODER_HEVC_TIER_HIGH, VE, .unit = "tier" },
     { "main",           "", 0, AV_OPT_TYPE_CONST, { .i64 = AMF_VIDEO_ENCODER_HEVC_TIER_MAIN }, 0, 0, VE, .unit = "tier" },
@@ -99,6 +100,8 @@ static const AVOption options[] = {
 
     { "log_to_dbg",     "Enable AMF logging to debug output",   OFFSET(log_to_dbg), AV_OPT_TYPE_BOOL,{ .i64 = 0 }, 0, 1, VE },
 
+    { "smart_access_video",     "Enable Smart Access Video",        OFFSET(smart_access_video), AV_OPT_TYPE_BOOL, {.i64 = -1  }, -1, 1, VE},
+
     //Pre Analysis options
     { "preanalysis",                            "Enable preanalysis",                                           OFFSET(preanalysis),                            AV_OPT_TYPE_BOOL,   {.i64 = -1 }, -1, 1, VE },
 
@@ -160,6 +163,9 @@ static av_cold int amf_encode_init_hevc(AVCodecContext *avctx)
     AMFRate             framerate;
     AMFSize             framesize = AMFConstructSize(avctx->width, avctx->height);
     int                 deblocking_filter = (avctx->flags & AV_CODEC_FLAG_LOOP_FILTER) ? 1 : 0;
+    amf_int64           color_depth;
+    amf_int64           color_profile;
+    enum                AVPixelFormat pix_fmt;
 
     if (avctx->framerate.num > 0 && avctx->framerate.den > 0) {
         framerate = AMFConstructRate(avctx->framerate.num, avctx->framerate.den);
@@ -183,9 +189,13 @@ FF_ENABLE_DEPRECATION_WARNINGS
 
     AMF_ASSIGN_PROPERTY_RATE(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_FRAMERATE, framerate);
 
+    color_depth = AMF_COLOR_BIT_DEPTH_8;
     switch (avctx->profile) {
     case AV_PROFILE_HEVC_MAIN:
         profile = AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN;
+        break;
+    case FF_PROFILE_HEVC_MAIN_10:
+        profile = AMF_VIDEO_ENCODER_HEVC_PROFILE_MAIN_10;
         break;
     default:
         break;
@@ -215,6 +225,51 @@ FF_ENABLE_DEPRECATION_WARNINGS
         AMF_ASSIGN_PROPERTY_RATIO(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_ASPECT_RATIO, ratio);
     }
 
+    // Color Metadata
+    /// Color Range (Support for older Drivers)
+    if (avctx->color_range == AVCOL_RANGE_JPEG) {
+        AMF_ASSIGN_PROPERTY_BOOL(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_NOMINAL_RANGE, 1);
+    } else {
+        AMF_ASSIGN_PROPERTY_BOOL(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_NOMINAL_RANGE, 0);
+    }
+    /// Color Space & Depth
+    pix_fmt = avctx->hw_frames_ctx ? ((AVHWFramesContext*)avctx->hw_frames_ctx->data)->sw_format
+                                    : avctx->pix_fmt;
+    if (pix_fmt == AV_PIX_FMT_P010 || pix_fmt == AV_PIX_FMT_YUV420P10) {
+        color_depth = AMF_COLOR_BIT_DEPTH_10;
+    }
+    color_profile = AMF_VIDEO_CONVERTER_COLOR_PROFILE_UNKNOWN;
+    switch (avctx->colorspace) {
+    case AVCOL_SPC_SMPTE170M:
+        if (avctx->color_range == AVCOL_RANGE_JPEG) {
+            color_profile = AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_601;
+        } else {
+            color_profile = AMF_VIDEO_CONVERTER_COLOR_PROFILE_601;
+        }
+        break;
+    case AVCOL_SPC_BT709:
+        if (avctx->color_range == AVCOL_RANGE_JPEG) {
+            color_profile = AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_709;
+        } else {
+            color_profile = AMF_VIDEO_CONVERTER_COLOR_PROFILE_709;
+        }
+        break;
+    case AVCOL_SPC_BT2020_NCL:
+    case AVCOL_SPC_BT2020_CL:
+        if (avctx->color_range == AVCOL_RANGE_JPEG) {
+            color_profile = AMF_VIDEO_CONVERTER_COLOR_PROFILE_FULL_2020;
+        } else {
+            color_profile = AMF_VIDEO_CONVERTER_COLOR_PROFILE_2020;
+        }
+        break;
+    }
+    AMF_ASSIGN_PROPERTY_INT64(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_COLOR_BIT_DEPTH, color_depth);
+    AMF_ASSIGN_PROPERTY_INT64(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_OUTPUT_COLOR_PROFILE, color_profile);
+    /// Color Transfer Characteristics (AMF matches ISO/IEC)
+    AMF_ASSIGN_PROPERTY_INT64(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_OUTPUT_TRANSFER_CHARACTERISTIC, (amf_int64)avctx->color_trc);
+    /// Color Primaries (AMF matches ISO/IEC)
+    AMF_ASSIGN_PROPERTY_INT64(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_OUTPUT_COLOR_PRIMARIES, (amf_int64)avctx->color_primaries);
+
     // Picture control properties
     AMF_ASSIGN_PROPERTY_INT64(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_NUM_GOPS_PER_IDR, ctx->gops_per_idr);
     AMF_ASSIGN_PROPERTY_INT64(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_GOP_SIZE, avctx->gop_size);
@@ -238,6 +293,21 @@ FF_ENABLE_DEPRECATION_WARNINGS
         } else {
             ctx->rate_control_mode = AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_CBR;
             av_log(ctx, AV_LOG_DEBUG, "Rate control turned to CBR\n");
+        }
+    }
+
+    if (ctx->smart_access_video != -1) {
+        AMF_ASSIGN_PROPERTY_BOOL(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_ENABLE_SMART_ACCESS_VIDEO, ctx->smart_access_video != 0);
+        if (res != AMF_OK) {
+            av_log(avctx, AV_LOG_ERROR, "The Smart Access Video is not supported by AMF.\n");
+            return AVERROR(EINVAL);
+        } else {
+            av_log(avctx, AV_LOG_INFO, "The Smart Access Video (%d) is set.\n", ctx->smart_access_video);
+            // Set low latency mode if Smart Access Video is enabled
+            if (ctx->smart_access_video != 0) {
+                AMF_ASSIGN_PROPERTY_BOOL(res, ctx->encoder, AMF_VIDEO_ENCODER_HEVC_LOWLATENCY_MODE, true);
+                av_log(avctx, AV_LOG_INFO, "The Smart Access Video set low latency mode.\n");
+            }
         }
     }
 
