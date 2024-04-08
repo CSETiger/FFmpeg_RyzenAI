@@ -26,6 +26,10 @@
 
 #include "pixfmt.h"
 
+#include "xrt/xrt_device.h"
+#include "xrt/xrt_kernel.h"
+#include "xrt/xrt_bo.h"
+
 /**
  * @file
  * An API-specific header for AV_HWDEVICE_TYPE_VITIS.
@@ -40,9 +44,10 @@ typedef struct AVVITISDeviceContextInternal AVVITISDeviceContextInternal;
  * This struct is allocated as AVHWDeviceContext.hwctx
  */
 typedef struct AVVITISDeviceContext {
-    CUcontext cuda_ctx;
-    CUstream stream;
-    AVVITISDeviceContextInternal *internal;
+    xrt::device xrt_device_ctx;
+    xrt::bo buffer_object;
+    xrt::kernel xrtkernerl;
+    /*AVVITISDeviceContextInternal *internal;*/
 } AVVITISDeviceContext;
 
 /**

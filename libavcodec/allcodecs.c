@@ -906,6 +906,10 @@ extern const FFCodec ff_vp9_qsv_decoder;
 extern const FFCodec ff_vp9_vaapi_encoder;
 extern const FFCodec ff_vp9_qsv_encoder;
 
+//Vitis codec hook
+extern const FFCodec ff_vitis_filter_decoder;
+extern const FFCodec ff_vitis_filter_encoder;
+
 // null codecs
 extern const FFCodec ff_vnull_decoder;
 extern const FFCodec ff_vnull_encoder;

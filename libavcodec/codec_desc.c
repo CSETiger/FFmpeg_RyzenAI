@@ -3723,6 +3723,12 @@ static const AVCodecDescriptor codec_descriptors[] = {
         .name      = "anull",
         .long_name = NULL_IF_CONFIG_SMALL("Null audio codec"),
     },
+    {
+        .id        = AV_CODEC_ID_VITIS_FILTER,
+        .type      = AVMEDIA_TYPE_VIDEO,
+        .name      = "vitis_filter",
+        .long_name = NULL_IF_CONFIG_SMALL("AVFrame to AVPacket via NPU"),
+    },
 };
 
 static int descriptor_compare(const void *key, const void *member)

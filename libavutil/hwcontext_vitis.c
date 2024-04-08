@@ -424,40 +424,17 @@ static int vitis_device_create(AVHWDeviceContext *device_ctx,
                               const char *device,
                               AVDictionary *opts, int flags)
 {
-    AVCUDADeviceContext *hwctx = device_ctx->hwctx;
-    CudaFunctions *cu;
-    int ret, device_idx = 0;
+    if (xclbin_fnm.empty())
+        throw std::runtime_error("FAILED_TEST\nNo xclbin specified");
 
-    ret = vitis_flags_from_opts(device_ctx, opts, &flags);
-    if (ret < 0)
-        goto error;
+    auto device = xrt::device(device_index);
+    auto uuid = device.load_xclbin(xclbin_fnm);
 
-    if (device)
-        device_idx = strtol(device, NULL, 0);
+    auto loopback = xrt::kernel(device, uuid.get(), "test");
 
-    ret = vitis_device_init(device_ctx);
-    if (ret < 0)
-        goto error;
+    
 
-    cu = hwctx->internal->cuda_dl;
-
-    ret = CHECK_CU(cu->cuInit(0));
-    if (ret < 0)
-        goto error;
-
-    ret = CHECK_CU(cu->cuDeviceGet(&hwctx->internal->cuda_device, device_idx));
-    if (ret < 0)
-        goto error;
-
-    ret = vitis_context_init(device_ctx, flags);
-    if (ret < 0)
-        goto error;
-
-    return 0;
-
-error:
-    vitis_device_uninit(device_ctx);
-    return ret;
+    
 }
 
 static int vitis_device_derive(AVHWDeviceContext *device_ctx,
@@ -559,8 +536,8 @@ error:
 }
 
 const HWContextType ff_hwcontext_type_vitis = {
-    .type                 = AV_HWDEVICE_TYPE_VITISAI,
-    .name                 = "VITISAI",
+    .type                 = AV_HWDEVICE_TYPE_VITIS,
+    .name                 = "VITIS",
 
     .device_hwctx_size    = sizeof(AVCUDADeviceContext),
     .frames_priv_size     = sizeof(CUDAFramesContext),

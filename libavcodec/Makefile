@@ -850,6 +850,8 @@ OBJS-$(CONFIG_ZLIB_DECODER)            += lcldec.o
 OBJS-$(CONFIG_ZLIB_ENCODER)            += lclenc.o
 OBJS-$(CONFIG_ZMBV_DECODER)            += zmbv.o
 OBJS-$(CONFIG_ZMBV_ENCODER)            += zmbvenc.o
+OBJS-$(CONFIG_VITIS_FILTER_DECODER)    += vitis_filter.o
+OBJS-$(CONFIG_VITIS_FILTER_ENCODER)    += vitis_filter.o
 
 # (AD)PCM decoders/encoders
 OBJS-$(CONFIG_PCM_ALAW_DECODER)           += pcm.o
