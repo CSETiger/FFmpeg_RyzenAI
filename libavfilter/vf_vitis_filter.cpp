@@ -20,16 +20,19 @@
  * @file
  * implementing an AI filter using RyzenAI.
  */
+extern "C"{
+    #include "libavutil/file_open.h"
+    #include "libavutil/opt.h"
+    #include "filters.h"
+    //#include "dnn_filter_common.h"
+    #include "internal.h"
+    #include "video.h"
+    #include "libavutil/time.h"
+    #include "libavutil/avstring.h"
+    #include "libavutil/detection_bbox.h"
+//    #include "libavutil/log.h"
+}
 
-#include "libavutil/file_open.h"
-#include "libavutil/opt.h"
-#include "filters.h"
-//#include "dnn_filter_common.h"
-#include "internal.h"
-#include "video.h"
-#include "libavutil/time.h"
-#include "libavutil/avstring.h"
-#include "libavutil/detection_bbox.h"
 #include "vitis/yolov8_onnx_avframe.hpp"
 
 #include <iostream>
@@ -40,7 +43,7 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui/highgui_c.h>
 
-#include "color.hpp"
+#include "vitis/color.hpp"
 
 typedef enum {
     DDMT_SSD,
@@ -155,7 +158,7 @@ static int vitis_filter_activate(AVFilterContext *filter_ctx)
     auto model = Yolov8Onnx::create(std::string(mode_name), 0.3);
     if (!model) {  // supress coverity complain
         //std::cout << "failed to create model\n";
-        av_log(AV_LOG_ERROR,"failed to create model\n");
+        av_log(NULL, AV_LOG_ERROR, "failed to create model\n");
         return 0;
     }
 

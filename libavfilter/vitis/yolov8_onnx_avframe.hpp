@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#define GLOG_USE_GLOG_EXPORT
 #pragma once
 #include <assert.h>
 #include <glog/logging.h>
@@ -28,6 +28,12 @@
 
 #include "onnx_task.hpp"
 #include "ai/profiling.hpp"
+
+extern "C"{
+  #include "libavutil/imgutils.h"
+  //#include "libavutil/log.h"
+  #include "libswscale/swscale.h"
+}
 
 DEF_ENV_PARAM(ENABLE_YOLO_DEBUG, "0");
 
@@ -313,9 +319,9 @@ Yolov8OnnxResult Yolov8Onnx::postprocess(int idx) {
     int ha = output_shapes_[i][2];
     int wa = output_shapes_[i][3];
     if (ENV_PARAM(ENABLE_YOLO_DEBUG)) {
-      LOG(INFO) << "channel=" << ca << ", height=" << ha << ", width=" << wa
+      /* LOG(INFO) << "channel=" << ca << ", height=" << ha << ", width=" << wa
                 << ", stride=" << stride[i] << ", conf=" << conf_thresh
-                << ", idx=" << idx << endl;
+                << ", idx=" << idx << endl; */
     }
     auto anchor_points = make_anchors(wa, ha);
     int sizeOut = wa * ha;
@@ -363,7 +369,7 @@ Yolov8OnnxResult Yolov8Onnx::postprocess(int idx) {
     return lhs[5] > rhs[5];
   };
   if (ENV_PARAM(ENABLE_YOLO_DEBUG)) {
-    LOG(INFO) << "boxes_total_size=" << boxes.size();
+    //LOG(INFO) << "boxes_total_size=" << boxes.size();
   }
   if (static_cast<int>(boxes.size()) > max_boxes_num) {
     std::partial_sort(boxes.begin(), boxes.begin() + max_boxes_num, boxes.end(),
@@ -448,8 +454,8 @@ Yolov8Onnx::Yolov8Onnx(const std::string& model_name, const float conf_thresh_)
   sHeight = input_shapes_[0][2];
   sWidth = input_shapes_[0][3];
   if (ENV_PARAM(ENABLE_YOLO_DEBUG)) {
-    LOG(INFO) << "channel=" << channel << ", height=" << sHeight
-              << ", width=" << sWidth << endl;
+    /* LOG(INFO) << "channel=" << channel << ", height=" << sHeight
+              << ", width=" << sWidth << endl; */
   }
   batch_size = channel * sHeight * sWidth;
   input_tensor_ptr.resize(1);
