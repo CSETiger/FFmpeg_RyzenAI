@@ -283,7 +283,7 @@ OBJS-$(CONFIG_DILATION_FILTER)               += vf_neighbor.o
 OBJS-$(CONFIG_DILATION_OPENCL_FILTER)        += vf_neighbor_opencl.o opencl.o \
                                                 opencl/neighbor.o
 OBJS-$(CONFIG_DISPLACE_FILTER)               += vf_displace.o framesync.o
-OBJS-$(CONFIG_VITIS_FILTER_FILTER)           += vf_vitis_filter.o
+OBJS-$(CONFIG_VITIS_FILTER_FILTER)           += vf_vitis_filter_c.o vf_vitis_filter.o
 OBJS-$(CONFIG_DNN_CLASSIFY_FILTER)           += vf_dnn_classify.o
 OBJS-$(CONFIG_DNN_DETECT_FILTER)             += vf_dnn_detect.o
 OBJS-$(CONFIG_DNN_PROCESSING_FILTER)         += vf_dnn_processing.o
@@ -661,6 +661,7 @@ SKIPHEADERS-$(CONFIG_VAAPI)                  += vaapi_vpp.h stack_internal.h
 SKIPHEADERS-$(CONFIG_VULKAN)                 += vulkan.h vulkan_filter.h
 SKIPHEADERS-$(CONFIG_LIBSHADERC)             += vulkan_spirv.h
 SKIPHEADERS-$(CONFIG_LIBGLSLANG)             += vulkan_spirv.h
+SKIPHEADERS-$(CONFIG_VITIS_FILTER_FILTER)    += vf_vitis_filter.h
 
 TOOLS     = graph2dot
 TESTPROGS = drawutils filtfmts formats integral

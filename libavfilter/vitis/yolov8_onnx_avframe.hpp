@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 #define GLOG_USE_GLOG_EXPORT
+#define GOOGLE_GLOG_DLL_DECL
 #pragma once
+
 #include <assert.h>
 #include <glog/logging.h>
 #include <opencv2/imgproc/imgproc_c.h>
@@ -31,7 +33,6 @@
 
 extern "C"{
   #include "libavutil/imgutils.h"
-  //#include "libavutil/log.h"
   #include "libswscale/swscale.h"
 }
 
@@ -263,7 +264,7 @@ cv::Mat avframeToCvmat(const AVFrame *frame) {
 }
 
 // from cv::mat to avframe
-AVFrame *cvmatToAvframe(cv::Mat *image, AVFrame *frame) {
+AVFrame *cvmatToAvframe(cv::Mat* image, AVFrame *frame) {
   int width = image->cols;
   int height = image->rows;
   int cvLinesizes[1];

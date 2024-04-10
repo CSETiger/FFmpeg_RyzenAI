@@ -24,18 +24,30 @@ extern "C"{
     #include "libavutil/file_open.h"
     #include "libavutil/opt.h"
     #include "filters.h"
+    #include "avfilter.h"
     //#include "dnn_filter_common.h"
     #include "internal.h"
     #include "video.h"
     #include "libavutil/time.h"
     #include "libavutil/avstring.h"
     #include "libavutil/detection_bbox.h"
-//    #include "libavutil/log.h"
 }
+
+//#define VART_UTIL_USE_DLL 0
+//#define VART_UTIL_DLLSPEC
+#pragma warning(disable:4996)
+#pragma comment(lib, "glog.lib") 
+#pragma comment(lib, "libcpmt.lib") 
+#pragma comment(lib, "opencv_world490.lib") 
+#pragma comment(lib, "onnxruntime.lib") 
+#pragma comment(lib, "onnxruntime_providers_shared.lib") 
 
 #include "vitis/yolov8_onnx_avframe.hpp"
 
 #include <iostream>
+#include <string>
+
+#include "vf_vitis_filter.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -45,104 +57,50 @@ extern "C"{
 
 #include "vitis/color.hpp"
 
-typedef enum {
-    DDMT_SSD,
-    DDMT_YOLOV1V2,
-    DDMT_YOLOV3,
-    DDMT_YOLOV4
-} DNNDetectionModelType;
+using namespace std;
+using namespace cv;
 
-/* typedef struct DnnContext {
-    //char *model_filename;
-    char *model_inputname;
-    //char *model_outputnames_string;
-    char *backend_options;
-    int async;
+extern "C"{
+void vitis_filter_process_result(cv::Mat& image, const Yolov8OnnxResult& result) {
+    for (auto& res : result.bboxes) {
+        int label = res.label;
+        auto& box = res.box;
 
-    char **model_outputnames;
-    uint32_t nb_outputs;
-    //const DNNModule *dnn_module;
-    //DNNModel *model;
-} DnnContext;
-
-typedef struct VitisFilterContext {
-    const AVClass *class;
-    DnnContext dnnctx;
-    float confidence;
-    //char *labels_filename;
-    char **labels;
-    int label_count;
-    DNNDetectionModelType model_type;
-    int cell_w;
-    int cell_h;
-    int nb_classes;
-    AVFifo *bboxes_fifo;
-    int scale_width;
-    int scale_height;
-    char *anchors_str;
-    float *anchors;
-    int nb_anchor;
-} VitisFilterContext; */
-
-//#define OFFSET(x) offsetof(VitisFilterContext, dnnctx.x)
-//#define OFFSET2(x) offsetof(VitisFilterContext, x)
-#define FLAGS AV_OPT_FLAG_FILTERING_PARAM | AV_OPT_FLAG_VIDEO_PARAM
-static const AVOption vitis_filter_options[] = {
-    DNN_COMMON_OPTIONS
-    { "confidence",  "threshold of confidence",    OFFSET2(confidence),      AV_OPT_TYPE_FLOAT,     { .dbl = 0.5 },  0, 1, FLAGS},
-    { "labels",      "path to labels file",        OFFSET2(labels_filename), AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },
-    { "target",      "which one to be classified", OFFSET2(target),          AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },
-    { NULL }
-};
-
-AVFILTER_DEFINE_CLASS(vitis_filter_class);
-
-static void vitis_filter_process_result(cv::Mat& image, const Yolov8OnnxResult& result) {
-  for (auto& res : result.bboxes) {
-    int label = res.label;
-    auto& box = res.box;
-
-    std::cout << "result: " << label << "\t"  << classes[label] << "\t" << std::fixed << std::setprecision(2)
-         << box[0] << "\t" << box[1] << "\t" << box[2] << "\t" << box[3] << "\t"
-         << std::setprecision(4) << res.score << "\n";
-    cv::rectangle(image, cv::Point(box[0], box[1]), cv::Point(box[2], box[3]),
-              cv::Scalar(b[label], g[label], r[label]), 3, 1, 0);
-    cv::putText(image, classes[label] + " " + std::to_string(res.score),
-                    cv::Point(box[0] + 5, box[1] + 20), cv::FONT_HERSHEY_SIMPLEX, 0.5,
-                    cv::Scalar(b[label], g[label], r[label]), 2, 4);
-                    // cv::Scalar(230, 216, 173), 2, 4);
-  }
-  return;
+        std::cout << "result: " << label << "\t"  << classes[label] << "\t" << std::fixed << std::setprecision(2)
+            << box[0] << "\t" << box[1] << "\t" << box[2] << "\t" << box[3] << "\t"
+            << std::setprecision(4) << res.score << "\n";
+        cv::rectangle(image, cv::Point(box[0], box[1]), cv::Point(box[2], box[3]),
+                cv::Scalar(b[label], g[label], r[label]), 3, 1, 0);
+        cv::putText(image, classes[label] + " " + std::to_string(res.score),
+                        cv::Point(box[0] + 5, box[1] + 20), cv::FONT_HERSHEY_SIMPLEX, 0.5,
+                        cv::Scalar(b[label], g[label], r[label]), 2, 4);
+                        // cv::Scalar(230, 216, 173), 2, 4);
+    }
+    return;
 }
 
-static av_cold int vitis_filter_init(AVFilterContext *context)
+
+
+av_cold int vitis_filter_init(AVFilterContext *context)
 {
     //VitisFilterContext *ctx = context->priv;
 
     return 0;
 }
 
-static const enum AVPixelFormat pix_fmts[] = {
-    AV_PIX_FMT_RGB24, AV_PIX_FMT_BGR24,
-    AV_PIX_FMT_GRAY8, AV_PIX_FMT_GRAYF32,
-    AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV422P,
-    AV_PIX_FMT_YUV444P, AV_PIX_FMT_YUV410P, AV_PIX_FMT_YUV411P,
-    AV_PIX_FMT_NV12,
-    AV_PIX_FMT_NONE
-};
 
-static int vitis_filter_flush_frame(AVFilterLink *outlink, int64_t pts, int64_t *out_pts)
+int vitis_filter_flush_frame(AVFilterLink *outlink, int64_t pts, int64_t *out_pts)
 {
     //VitisFilterContext *ctx = outlink->src->priv;
     
     return 0;
 }
 
-static int vitis_filter_activate(AVFilterContext *filter_ctx)
+int vitis_filter_activate(AVFilterContext *filter_ctx)
 {
     AVFilterLink *inlink = filter_ctx->inputs[0];
     AVFilterLink *outlink = filter_ctx->outputs[0];
-    //VitisFilterContext *ctx = filter_ctx->priv;
+    VitisFilterContext *ctx = (VitisFilterContext *)filter_ctx->priv;
     AVFrame *in = NULL;
     int64_t pts;
     int ret, status;
@@ -151,7 +109,7 @@ static int vitis_filter_activate(AVFilterContext *filter_ctx)
 
     FF_FILTER_FORWARD_STATUS_BACK(outlink, inlink);
 
-    char* mode_name = ctx->dnnctx.model_name;
+    char* mode_name = ctx->dnnctx.model_filename;
 
     //load models and create filters
     //std::cout << "load model " << argv[1] << endl;
@@ -182,7 +140,7 @@ static int vitis_filter_activate(AVFilterContext *filter_ctx)
             //cv::imshow("yolov8-camera", images[0]);
             __TOC__(SHOW)
 
-            in = cvmatToAvframe(images[0],in);
+            in = cvmatToAvframe(&images[0],in);
             ret = ff_filter_frame(outlink, in);
     } while (ret > 0);
 
@@ -217,29 +175,10 @@ static int vitis_filter_activate(AVFilterContext *filter_ctx)
     return 0;
 }
 
-static av_cold void vitis_filter_uninit(AVFilterContext *context)
+av_cold void vitis_filter_uninit(AVFilterContext *context)
 {
     //VitisFilterContext *ctx = context->priv;
     
 }
 
-static const AVFilterPad vitis_filter_inputs[] = {
-    {
-        .name         = "default",
-        .type         = AVMEDIA_TYPE_VIDEO,
-        .config_props = config_input,
-    },
-};
-
-const AVFilter ff_vf_vitis_filter = {
-    .name          = "vitis_filter",
-    .description   = NULL_IF_CONFIG_SMALL("Apply Vitis filter to the input."),
-    //.priv_size     = sizeof(VitisFilterContext),
-    .init          = vitis_filter_init,
-    .uninit        = vitis_filter_uninit,
-    FILTER_INPUTS(vitis_filter_inputs),
-    FILTER_OUTPUTS(ff_video_default_filterpad),
-    FILTER_PIXFMTS_ARRAY(pix_fmts),
-    .priv_class    = &vitis_filter_class,
-    .activate      = vitis_filter_activate,
-};
+}

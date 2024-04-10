@@ -16,15 +16,17 @@
 #pragma once
 #include <core/session/experimental_onnxruntime_cxx_api.h>
 #include "core/session/onnxruntime_session_options_config_keys.h"
-#include "ai/env_config.hpp"
+#include "ai/parse_value.hpp"
 #include "ai/profiling.hpp"
 #include <sstream>
-#include "libavutil/frame.h"
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+// #include "libavutil/frame.h"
+// #include <stdlib.h>
+// #include <stdint.h>
+// #include <string.h>
 #if _WIN32
+extern "C" {
 #  include "util/getopt.h"
+}
 #  include <codecvt>
 #  include <locale>
 using convert_t = std::codecvt_utf8<wchar_t>;
