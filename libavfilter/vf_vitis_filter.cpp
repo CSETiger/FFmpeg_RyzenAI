@@ -32,22 +32,19 @@ extern "C"{
     #include "libavutil/avstring.h"
     #include "libavutil/detection_bbox.h"
 }
+//#include <iostream>
+#include "vf_vitis_filter.h"
 
 //#define VART_UTIL_USE_DLL 0
 //#define VART_UTIL_DLLSPEC
-#pragma warning(disable:4996)
+//#pragma warning(disable:4996)
 #pragma comment(lib, "glog.lib") 
-#pragma comment(lib, "libcpmt.lib") 
+//#pragma comment(lib, "libcpmt.lib") 
 #pragma comment(lib, "opencv_world490.lib") 
 #pragma comment(lib, "onnxruntime.lib") 
 #pragma comment(lib, "onnxruntime_providers_shared.lib") 
 
 #include "vitis/yolov8_onnx_avframe.hpp"
-
-#include <iostream>
-#include <string>
-
-#include "vf_vitis_filter.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -57,7 +54,7 @@ extern "C"{
 
 #include "vitis/color.hpp"
 
-using namespace std;
+//namespace std {
 using namespace cv;
 
 extern "C"{
@@ -66,9 +63,9 @@ void vitis_filter_process_result(cv::Mat& image, const Yolov8OnnxResult& result)
         int label = res.label;
         auto& box = res.box;
 
-        std::cout << "result: " << label << "\t"  << classes[label] << "\t" << std::fixed << std::setprecision(2)
+        /* std::cout << "result: " << label << "\t"  << classes[label] << "\t" << std::fixed << std::setprecision(2)
             << box[0] << "\t" << box[1] << "\t" << box[2] << "\t" << box[3] << "\t"
-            << std::setprecision(4) << res.score << "\n";
+            << std::setprecision(4) << res.score << "\n"; */
         cv::rectangle(image, cv::Point(box[0], box[1]), cv::Point(box[2], box[3]),
                 cv::Scalar(b[label], g[label], r[label]), 3, 1, 0);
         cv::putText(image, classes[label] + " " + std::to_string(res.score),
@@ -78,7 +75,6 @@ void vitis_filter_process_result(cv::Mat& image, const Yolov8OnnxResult& result)
     }
     return;
 }
-
 
 
 av_cold int vitis_filter_init(AVFilterContext *context)
@@ -181,4 +177,7 @@ av_cold void vitis_filter_uninit(AVFilterContext *context)
     
 }
 
-}
+} //extern "C"
+//}
+//} //namespace ai
+//} //namespace vitis

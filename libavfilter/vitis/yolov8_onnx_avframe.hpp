@@ -36,6 +36,13 @@ extern "C"{
   #include "libswscale/swscale.h"
 }
 
+#define __TIC__(tag)
+#define __TOC__(tag)
+
+#define ENV_PARAM(param_name) 0
+
+#define DEF_ENV_PARAM(param_name, defvalue1)                               
+
 DEF_ENV_PARAM(ENABLE_YOLO_DEBUG, "0");
 
 using namespace std;

@@ -20,9 +20,9 @@
 #include "ai/profiling.hpp"
 #include <sstream>
 // #include "libavutil/frame.h"
-// #include <stdlib.h>
+#include <stdlib.h>
 // #include <stdint.h>
-// #include <string.h>
+#include <string.h>
 #if _WIN32
 extern "C" {
 #  include "util/getopt.h"
@@ -33,7 +33,7 @@ using convert_t = std::codecvt_utf8<wchar_t>;
 std::wstring_convert<convert_t, wchar_t> strconverter;
 #endif
 
-DEF_ENV_PARAM(DEBUG_ONNX_TASK, "0")
+//DEF_ENV_PARAM(DEBUG_ONNX_TASK, "0")
 
 extern int onnx_x = -1;
 extern int onnx_y = -1;
@@ -168,7 +168,7 @@ class OnnxTask {
   void run_task(const std::vector<Ort::Value>& input_tensors,
                 std::vector<Ort::Value>& output_tensors) {
     std::vector<std::string> input_names = session_->GetInputNames();
-    if (ENV_PARAM(DEBUG_ONNX_TASK)) {
+    /* if (ENV_PARAM(DEBUG_ONNX_TASK)) {
       auto input_shapes = get_input_shapes();
       std::cout << "Input Node Name/Shape (" << input_names.size()
                 << "):" << std::endl;
@@ -186,7 +186,7 @@ class OnnxTask {
         std::cout << "\t" << output_names[i] << " : "
                   << print_shape(output_shapes[i]) << std::endl;
       }
-    }
+    } */
 
     output_tensors = session_->Run(session_->GetInputNames(), input_tensors,
                                    session_->GetOutputNames());
