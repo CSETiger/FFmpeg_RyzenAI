@@ -46,7 +46,7 @@ typedef struct Yolov8_Ctx {
 } Yolov8_Ctx;
 
 typedef struct VitisFilterContext {
-    //const AVClass *class;
+    const AVClass *cclass;
     DnnContext dnnctx;
     Yolov3_Ctx yolov3ctx;
     Yolov8_Ctx yolov8ctx;
