@@ -17,16 +17,16 @@
 
 #define RYZENAI_OPTIONS \
     { "model",              "path to model file",         OFFSET(model_filename),   AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },\
-    { "input",              "input name of the model",    OFFSET(model_inputname),  AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },\
-    { "output",             "output name of the model",   OFFSET(model_outputnames_string), AV_OPT_TYPE_STRING, { .str = NULL }, 0, 0, FLAGS },\
+    //{ "input",              "input name of the model",    OFFSET(model_inputname),  AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },\
+    //{ "output",             "output name of the model",   OFFSET(model_outputnames_string), AV_OPT_TYPE_STRING, { .str = NULL }, 0, 0, FLAGS },\
     { "backend_configs",    "backend configs",            OFFSET(backend_options),  AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },\
     { "options", "backend configs (deprecated, use backend_configs)", OFFSET(backend_options),  AV_OPT_TYPE_STRING, { .str = NULL }, 0, 0, FLAGS | AV_OPT_FLAG_DEPRECATED},\
     //{ "async",              "use DNN async inference (ignored, use backend_configs='async=1')",    OFFSET(async),            AV_OPT_TYPE_BOOL,      { .i64 = 1},     0, 1, FLAGS},
 
 static const AVOption vitis_filter_options[] = {
     RYZENAI_OPTIONS
-    { "confidence",  "threshold of confidence",    OFFSET2(confidence),      AV_OPT_TYPE_FLOAT,     { .dbl = 0.5 },  0, 1, FLAGS},
-    { "labels",      "path to labels file",        OFFSET2(labels_filename), AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },
+    { "confidence",  "threshold of confidence",    OFFSET2(confidence),      AV_OPT_TYPE_FLOAT,     { .dbl = 0.3 },  0, 1, FLAGS},
+    //{ "labels",      "path to labels file",        OFFSET2(labels_filename), AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },
     //{ "target",      "which one to be classified", OFFSET2(target),          AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },
     { NULL }
 };
@@ -41,14 +41,21 @@ static const AVFilterPad vitis_filter_inputs[] = {
     },
 };
 
+static const AVFilterPad vitis_filter_outputs[] = {
+    {
+        .name         = "default",
+        .type         = AVMEDIA_TYPE_VIDEO,
+    },
+};
+
 const AVFilter ff_vf_vitis_filter = {
     .name          = "vitis_filter",
-    .description   = NULL_IF_CONFIG_SMALL("Apply Vitis filter to the input."),
-    //.priv_size     = sizeof(VitisFilterContext),
+    .description   = NULL_IF_CONFIG_SMALL("Apply Ryzen AI Effects to the video."),
+    .priv_size     = sizeof(VitisFilterContext),
     .init          = vitis_filter_init,
     .uninit        = vitis_filter_uninit,
     FILTER_INPUTS(vitis_filter_inputs),
-    FILTER_OUTPUTS(ff_video_default_filterpad),
+    FILTER_OUTPUTS(vitis_filter_outputs),
     FILTER_PIXFMTS_ARRAY(pix_fmts),
     .priv_class    = &vitis_filter_class,
     .activate      = vitis_filter_activate,

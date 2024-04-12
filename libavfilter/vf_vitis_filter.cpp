@@ -25,7 +25,6 @@ extern "C"{
     #include "libavutil/opt.h"
     #include "filters.h"
     #include "avfilter.h"
-    //#include "dnn_filter_common.h"
     #include "internal.h"
     #include "video.h"
     #include "libavutil/time.h"
@@ -35,11 +34,7 @@ extern "C"{
 //#include <iostream>
 #include "vf_vitis_filter.h"
 
-//#define VART_UTIL_USE_DLL 0
-//#define VART_UTIL_DLLSPEC
-//#pragma warning(disable:4996)
 #pragma comment(lib, "glog.lib") 
-//#pragma comment(lib, "libcpmt.lib") 
 #pragma comment(lib, "opencv_world490.lib") 
 #pragma comment(lib, "onnxruntime.lib") 
 #pragma comment(lib, "onnxruntime_providers_shared.lib") 
@@ -56,6 +51,8 @@ extern "C"{
 
 //namespace std {
 using namespace cv;
+
+std::unique_ptr<Yolov8Onnx> model;
 
 extern "C"{
 void vitis_filter_process_result(cv::Mat& image, const Yolov8OnnxResult& result) {
@@ -79,53 +76,67 @@ void vitis_filter_process_result(cv::Mat& image, const Yolov8OnnxResult& result)
 
 av_cold int vitis_filter_init(AVFilterContext *context)
 {
-    //VitisFilterContext *ctx = context->priv;
+    //auto model;
+    av_log(NULL, AV_LOG_INFO, "vitis filter: vitis_filter_init entering---->\n");
+
+    VitisFilterContext *ctx = (VitisFilterContext *)context->priv;
+    model.reset(nullptr);
+    char* mode_name = ctx->dnnctx.model_filename;
+    //load models and create filters
+    //std::cout << "load model " << argv[1] << endl;
+    model = Yolov8Onnx::create(std::string(mode_name), ctx->confidence);
+    //ctx->model = model.get();
+    if (!model) {  // supress coverity complain
+        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create model\n");
+        return -1;
+    }
 
     return 0;
 }
 
-
-int vitis_filter_flush_frame(AVFilterLink *outlink, int64_t pts, int64_t *out_pts)
+/*use filter activate instead of filter frame*/
+int vitis_filter_frame(AVFilterLink *inlink, AVFrame *in)
 {
-    //VitisFilterContext *ctx = outlink->src->priv;
+    av_log(NULL, AV_LOG_INFO, "vitis filter: vitis_filter_frame entering---->\n");
     
     return 0;
 }
 
 int vitis_filter_activate(AVFilterContext *filter_ctx)
 {
+    av_log(NULL, AV_LOG_INFO, "vitis filter: vitis_filter_activate entering---->\n");
+
     AVFilterLink *inlink = filter_ctx->inputs[0];
     AVFilterLink *outlink = filter_ctx->outputs[0];
     VitisFilterContext *ctx = (VitisFilterContext *)filter_ctx->priv;
-    AVFrame *in = NULL;
+    AVFrame *in_frame = NULL;
+    AVFrame *out_frame = NULL;
     int64_t pts;
     int ret, status;
-    int got_frame = 0;
+    std::vector<cv::Mat> images(1);
+    //char* mode_name = ctx->dnnctx.model_filename;
+    //int got_frame = 0;
     //int async_state;
 
     FF_FILTER_FORWARD_STATUS_BACK(outlink, inlink);
 
-    char* mode_name = ctx->dnnctx.model_filename;
-
     //load models and create filters
     //std::cout << "load model " << argv[1] << endl;
-    auto model = Yolov8Onnx::create(std::string(mode_name), 0.3);
-    if (!model) {  // supress coverity complain
+    //auto model = Yolov8Onnx::create(std::string(mode_name), ctx->confidence);
+    if (model) {  // supress coverity complain
         //std::cout << "failed to create model\n";
-        av_log(NULL, AV_LOG_ERROR, "failed to create model\n");
+        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create model\n");
         return 0;
     }
 
-    std::vector<cv::Mat> images(1);
-
     do {
         // drain all input frames
-        ret = ff_inlink_consume_frame(inlink, &in);
+        ret = ff_inlink_consume_frame(inlink, &in_frame);
         if (ret < 0)
             return ret;
         if (ret > 0) 
             //avframe to vitis tensor data
-            images[0] = avframeToCvmat(in);
+            images[0] = avframeToCvmat(in_frame);
 
             __TIC__(ONNX_RUN)
             auto results = model->run(images);
@@ -136,8 +147,12 @@ int vitis_filter_activate(AVFilterContext *filter_ctx)
             //cv::imshow("yolov8-camera", images[0]);
             __TOC__(SHOW)
 
-            in = cvmatToAvframe(&images[0],in);
-            ret = ff_filter_frame(outlink, in);
+            out_frame = cvmatToAvframe(&images[0],in_frame);
+            ret = ff_filter_frame(outlink, out_frame);
+            if (ret < 0){
+                av_frame_free(&out_frame);
+                return ret;
+            }
     } while (ret > 0);
 
     /* // drain all processed frames
@@ -156,25 +171,29 @@ int vitis_filter_activate(AVFilterContext *filter_ctx)
     // if frame got, schedule to next filter
     if (got_frame)
         return 0;
-
+    */
     if (ff_inlink_acknowledge_status(inlink, &status, &pts)) {
         if (status == AVERROR_EOF) {
-            int64_t out_pts = pts;
-            ret = vitis_filter_flush_frame(outlink, pts, &out_pts);
-            ff_outlink_set_status(outlink, status, out_pts);
-            return ret;
+            //int64_t out_pts = pts;
+            //ret = vitis_filter_flush_frame(outlink, pts, &out_pts);
+            ff_outlink_set_status(outlink, status, pts);
+            return 0;
         }
     }
-
-    FF_FILTER_FORWARD_WANTED(outlink, inlink); */
+    
+    FF_FILTER_FORWARD_WANTED(outlink, inlink); 
 
     return 0;
 }
 
 av_cold void vitis_filter_uninit(AVFilterContext *context)
 {
-    //VitisFilterContext *ctx = context->priv;
-    
+    av_log(NULL, AV_LOG_INFO, "vitis filter: vitis_filter_uninit entering---->\n");
+    VitisFilterContext *ctx = (VitisFilterContext *)context->priv;
+    if (model){
+        model.reset(nullptr);
+    }
+        //Yolov8Onnx((Yolov8Onnx*)ctx->model);
 }
 
 } //extern "C"

@@ -19,7 +19,7 @@ typedef struct DnnContext {
     char *model_inputname;
     char *model_outputnames_string;
     char *backend_options;
-    int async;
+    //int async;
 
     char **model_outputnames;
     uint32_t nb_outputs;
@@ -27,10 +27,31 @@ typedef struct DnnContext {
     //DNNModel *model;
 } DnnContext;
 
+typedef struct Yolov3_Ctx {
+    char *model_filename;
+    char *model_inputname;
+    char *model_outputnames_string;
+    char *backend_options;
+    char **model_outputnames;
+    uint32_t nb_outputs;
+} Yolov3_Ctx;
+
+typedef struct Yolov8_Ctx {
+    char *model_filename;
+    char *model_inputname;
+    char *model_outputnames_string;
+    char *backend_options;
+    char **model_outputnames;
+    uint32_t nb_outputs;
+} Yolov8_Ctx;
+
 typedef struct VitisFilterContext {
     //const AVClass *class;
     DnnContext dnnctx;
+    Yolov3_Ctx yolov3ctx;
+    Yolov8_Ctx yolov8ctx;
     float confidence;
+    //void* model;
     char *labels_filename;
     char **labels;
     int label_count;
@@ -56,7 +77,7 @@ static const enum AVPixelFormat pix_fmts[] = {
 };
 
 av_cold int vitis_filter_init(AVFilterContext *context);
-int vitis_filter_flush_frame(AVFilterLink *outlink, int64_t pts, int64_t *out_pts);
+int vitis_filter_frame(AVFilterLink *inlink, AVFrame *in); //legacy, use activate function instead
 int vitis_filter_activate(AVFilterContext *filter_ctx);
 av_cold void vitis_filter_uninit(AVFilterContext *context);
 
