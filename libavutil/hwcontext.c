@@ -69,6 +69,9 @@ static const HWContextType * const hw_table[] = {
 #if CONFIG_VITIS
     &ff_hwcontext_type_vitis,
 #endif
+#if CONFIG_AMF
+    &ff_hwcontext_type_amf,
+#endif
     NULL,
 };
 
@@ -85,7 +88,8 @@ static const char *const hw_type_names[] = {
     [AV_HWDEVICE_TYPE_VIDEOTOOLBOX] = "videotoolbox",
     [AV_HWDEVICE_TYPE_MEDIACODEC] = "mediacodec",
     [AV_HWDEVICE_TYPE_VULKAN] = "vulkan",
-    [AV_HWDEVICE_TYPE_VITISAI] = "vitisai",
+    [AV_HWDEVICE_TYPE_VITIS] = "vitis",
+    [AV_HWDEVICE_TYPE_AMF] = "amf",
 };
 
 enum AVHWDeviceType av_hwdevice_find_type_by_name(const char *name)

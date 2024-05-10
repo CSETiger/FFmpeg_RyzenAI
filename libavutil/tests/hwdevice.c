@@ -128,7 +128,7 @@ static const struct {
     enum AVHWDeviceType type;
     const char *possible_devices[5];
 } test_devices[] = {
-    { AV_HWDEVICE_TYPE_VITISAI,
+    { AV_HWDEVICE_TYPE_VITIS,
       { "0", "1", "2" } },
     { AV_HWDEVICE_TYPE_CUDA,
       { "0", "1", "2" } },

@@ -69,7 +69,7 @@ include $(SRC_PATH)/libavcodec/x86/vvc/Makefile
 OBJS-$(CONFIG_AANDCTTABLES)            += aandcttab.o
 OBJS-$(CONFIG_AC3DSP)                  += ac3dsp.o ac3.o ac3tab.o
 OBJS-$(CONFIG_ADTS_HEADER)             += adts_header.o mpeg4audio_sample_rates.o
-OBJS-$(CONFIG_AMF)                     += amfenc.o
+OBJS-$(CONFIG_AMF)                     += amfenc.o amfdec.o
 OBJS-$(CONFIG_AUDIO_FRAME_QUEUE)       += audio_frame_queue.o
 OBJS-$(CONFIG_ATSC_A53)                += atsc_a53.o
 OBJS-$(CONFIG_AUDIODSP)                += audiodsp.o
@@ -850,6 +850,8 @@ OBJS-$(CONFIG_ZLIB_DECODER)            += lcldec.o
 OBJS-$(CONFIG_ZLIB_ENCODER)            += lclenc.o
 OBJS-$(CONFIG_ZMBV_DECODER)            += zmbv.o
 OBJS-$(CONFIG_ZMBV_ENCODER)            += zmbvenc.o
+OBJS-$(CONFIG_VITIS_FILTER_DECODER)    += vitis_filter.o
+OBJS-$(CONFIG_VITIS_FILTER_ENCODER)    += vitis_filter.o
 
 # (AD)PCM decoders/encoders
 OBJS-$(CONFIG_PCM_ALAW_DECODER)           += pcm.o
@@ -1265,7 +1267,7 @@ SKIPHEADERS                            += %_tablegen.h                  \
                                           vulkan_video_codec_av1std_mesa.h \
                                           $(ARCH)/vpx_arith.h          \
 
-SKIPHEADERS-$(CONFIG_AMF)              += amfenc.h
+SKIPHEADERS-$(CONFIG_AMF)              += amfenc.h amfdec.h
 SKIPHEADERS-$(CONFIG_D3D11VA)          += d3d11va.h dxva2_internal.h
 SKIPHEADERS-$(CONFIG_D3D12VA)          += d3d12va_decode.h
 SKIPHEADERS-$(CONFIG_DXVA2)            += dxva2.h dxva2_internal.h

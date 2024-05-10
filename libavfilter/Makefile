@@ -283,6 +283,7 @@ OBJS-$(CONFIG_DILATION_FILTER)               += vf_neighbor.o
 OBJS-$(CONFIG_DILATION_OPENCL_FILTER)        += vf_neighbor_opencl.o opencl.o \
                                                 opencl/neighbor.o
 OBJS-$(CONFIG_DISPLACE_FILTER)               += vf_displace.o framesync.o
+OBJS-$(CONFIG_VITIS_FILTER_FILTER)           += vf_vitis_filter_c.o vf_vitis_filter.o
 OBJS-$(CONFIG_DNN_CLASSIFY_FILTER)           += vf_dnn_classify.o
 OBJS-$(CONFIG_DNN_DETECT_FILTER)             += vf_dnn_detect.o
 OBJS-$(CONFIG_DNN_PROCESSING_FILTER)         += vf_dnn_processing.o
@@ -456,6 +457,8 @@ OBJS-$(CONFIG_ROBERTS_OPENCL_FILTER)         += vf_convolution_opencl.o opencl.o
 OBJS-$(CONFIG_ROTATE_FILTER)                 += vf_rotate.o
 OBJS-$(CONFIG_SAB_FILTER)                    += vf_sab.o
 OBJS-$(CONFIG_SCALE_FILTER)                  += vf_scale.o scale_eval.o
+OBJS-$(CONFIG_SCALE_AMF_FILTER)              += vf_scale_amf.o scale_eval.o amf_common.o
+OBJS-$(CONFIG_SCALE_AMF_FILTER)              += vf_scale_amf_hq.o scale_eval.o amf_common.o
 OBJS-$(CONFIG_SCALE_CUDA_FILTER)             += vf_scale_cuda.o scale_eval.o \
                                                 vf_scale_cuda.ptx.o cuda/load_helper.o
 OBJS-$(CONFIG_SCALE_NPP_FILTER)              += vf_scale_npp.o scale_eval.o
@@ -658,6 +661,7 @@ SKIPHEADERS-$(CONFIG_VAAPI)                  += vaapi_vpp.h stack_internal.h
 SKIPHEADERS-$(CONFIG_VULKAN)                 += vulkan.h vulkan_filter.h
 SKIPHEADERS-$(CONFIG_LIBSHADERC)             += vulkan_spirv.h
 SKIPHEADERS-$(CONFIG_LIBGLSLANG)             += vulkan_spirv.h
+SKIPHEADERS-$(CONFIG_VITIS_FILTER_FILTER)    += vf_vitis_filter.h
 
 TOOLS     = graph2dot
 TESTPROGS = drawutils filtfmts formats integral

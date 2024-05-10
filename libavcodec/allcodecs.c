@@ -851,10 +851,12 @@ extern const FFCodec ff_av1_nvenc_encoder;
 extern const FFCodec ff_av1_qsv_decoder;
 extern const FFCodec ff_av1_qsv_encoder;
 extern const FFCodec ff_av1_amf_encoder;
+extern const FFCodec ff_av1_amf_decoder;
 extern const FFCodec ff_av1_vaapi_encoder;
 extern const FFCodec ff_libopenh264_encoder;
 extern const FFCodec ff_libopenh264_decoder;
 extern const FFCodec ff_h264_amf_encoder;
+extern const FFCodec ff_h264_amf_decoder;
 extern const FFCodec ff_h264_cuvid_decoder;
 extern const FFCodec ff_h264_mf_encoder;
 extern const FFCodec ff_h264_nvenc_encoder;
@@ -864,6 +866,7 @@ extern const FFCodec ff_h264_v4l2m2m_encoder;
 extern const FFCodec ff_h264_vaapi_encoder;
 extern const FFCodec ff_h264_videotoolbox_encoder;
 extern const FFCodec ff_hevc_amf_encoder;
+extern const FFCodec ff_hevc_amf_decoder;
 extern const FFCodec ff_hevc_cuvid_decoder;
 extern const FFCodec ff_hevc_mediacodec_decoder;
 extern const FFCodec ff_hevc_mediacodec_encoder;
@@ -902,6 +905,10 @@ extern const FFCodec ff_vp9_mediacodec_encoder;
 extern const FFCodec ff_vp9_qsv_decoder;
 extern const FFCodec ff_vp9_vaapi_encoder;
 extern const FFCodec ff_vp9_qsv_encoder;
+
+//Vitis codec hook
+extern const FFCodec ff_vitis_filter_decoder;
+extern const FFCodec ff_vitis_filter_encoder;
 
 // null codecs
 extern const FFCodec ff_vnull_decoder;

@@ -601,6 +601,7 @@ enum AVCodecID {
                                 * stream (only used by libavformat) */
     AV_CODEC_ID_FFMETADATA = 0x21000,   ///< Dummy codec for streams containing only metadata information.
     AV_CODEC_ID_WRAPPED_AVFRAME = 0x21001, ///< Passthrough codec, AVFrames wrapped in AVPacket
+    AV_CODEC_ID_VITIS_FILTER = 0x21002, ///< Vitis codec hook, AVFrames wrapped in AVPacket, used to process filters by NPU
     /**
      * Dummy null video codec, useful mainly for development and debugging.
      * Null encoder/decoder discard all input and never return any output.

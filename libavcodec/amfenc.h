@@ -1,3 +1,5 @@
+
+
 /*
 * This file is part of FFmpeg.
 *
@@ -24,7 +26,9 @@
 #include <AMF/components/VideoEncoderVCE.h>
 #include <AMF/components/VideoEncoderHEVC.h>
 #include <AMF/components/VideoEncoderAV1.h>
+#include <AMF/components/ColorSpace.h>
 
+#include "libavutil/hwcontext_amf.h"
 #include "libavutil/fifo.h"
 
 #include "avcodec.h"
@@ -33,30 +37,15 @@
 #define  MAX_LOOKAHEAD_DEPTH 41
 
 /**
-* AMF trace writer callback class
-* Used to capture all AMF logging
-*/
-
-typedef struct AmfTraceWriter {
-    AMFTraceWriterVtbl *vtbl;
-    AVCodecContext     *avctx;
-} AmfTraceWriter;
-
-/**
 * AMF encoder context
 */
 
 typedef struct AmfContext {
     AVClass            *avclass;
     // access to AMF runtime
-    amf_handle          library; ///< handle to DLL library
-    AMFFactory         *factory; ///< pointer to AMF factory
-    AMFDebug           *debug;   ///< pointer to AMF debug interface
-    AMFTrace           *trace;   ///< pointer to AMF trace interface
 
-    amf_uint64          version; ///< version of AMF runtime
-    AmfTraceWriter      tracer;  ///< AMF writer registered with AMF
-    AMFContext         *context; ///< AMF context
+    AVBufferRef        *amf_device_ctx_internal;
+
     //encoder
     AMFComponent       *encoder; ///< AMF encoder object
     amf_bool            eof;     ///< flag indicating EOF happened
@@ -70,8 +59,6 @@ typedef struct AmfContext {
 
     // helpers to handle async calls
     int                 delayed_drain;
-    AMFSurface         *delayed_surface;
-    AVFrame            *delayed_frame;
 
     // shift dts back by max_b_frames in timing
     AVFifo             *timestamp_list;
@@ -89,6 +76,7 @@ typedef struct AmfContext {
     int                 quality;
     int                 b_frame_delta_qp;
     int                 ref_b_frame_delta_qp;
+    int                 smart_access_video;
 
     // Dynamic options, can be set after Init() call
 
@@ -169,14 +157,5 @@ int ff_amf_receive_packet(AVCodecContext *avctx, AVPacket *avpkt);
 * Supported formats
 */
 extern const enum AVPixelFormat ff_amf_pix_fmts[];
-
-/**
-* Error handling helper
-*/
-#define AMF_RETURN_IF_FALSE(avctx, exp, ret_value, /*message,*/ ...) \
-    if (!(exp)) { \
-        av_log(avctx, AV_LOG_ERROR, __VA_ARGS__); \
-        return ret_value; \
-    }
 
 #endif //AVCODEC_AMFENC_H
