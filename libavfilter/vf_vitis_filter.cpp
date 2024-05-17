@@ -84,10 +84,11 @@ av_cold int vitis_filter_init(AVFilterContext *context)
     VitisFilterContext *ctx = (VitisFilterContext *)context->priv;
     //model.reset(nullptr);
     char* model_name = ctx->dnnctx.model_filename;
+    char* ep_name = ctx->dnnctx.ep_name;
     //load models and create filters
     //std::cout << "load model " << argv[1] << endl;
     av_log(NULL, AV_LOG_INFO, "vitis filter: model_name %s\n",model_name);
-    auto model = Yolov8Onnx::create(std::string(model_name), ctx->confidence);
+    auto model = Yolov8Onnx::create(std::string(model_name), ctx->confidence, std::string(ep_name));
     //ctx->model = model.get();
     if (!model) {  // supress coverity complain
         av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create model\n");

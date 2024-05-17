@@ -207,14 +207,15 @@ struct Yolov8OnnxResult {
 class Yolov8Onnx : public OnnxTask {
  public:
   static std::unique_ptr<Yolov8Onnx> create(const std::string& model_name,
-                                            const float conf_thresh_) {
+                                            const float conf_thresh_,
+                                            const std::string& ep_name) {
     // cout << "create" << endl;
     return std::unique_ptr<Yolov8Onnx>(
-        new Yolov8Onnx(model_name, conf_thresh_));
+        new Yolov8Onnx(model_name, conf_thresh_, ep_name));
   }
 
  protected:
-  explicit Yolov8Onnx(const std::string& model_name, const float conf_thresh_);
+  explicit Yolov8Onnx(const std::string& model_name, const float conf_thresh_, const std::string& ep_name);
   Yolov8Onnx(const Yolov8Onnx&) = delete;
 
  public:
@@ -451,8 +452,8 @@ static int calculate_product(const std::vector<int64_t>& v) {
   return total;
 }
 
-Yolov8Onnx::Yolov8Onnx(const std::string& model_name, const float conf_thresh_)
-    : OnnxTask(model_name) {
+Yolov8Onnx::Yolov8Onnx(const std::string& model_name, const float conf_thresh_, const std::string& ep_name)
+    : OnnxTask(model_name, ep_name) {
   int total_number_elements = calculate_product(input_shapes_[0]);
   // cout << total_number_elements << endl; 
   std::vector<float> input_tensor_values_(total_number_elements);

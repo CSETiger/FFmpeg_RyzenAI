@@ -17,6 +17,7 @@
 
 #define RYZENAI_OPTIONS \
     { "model",              "path to model file",         OFFSET(model_filename),   AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },\
+    { "ep",    "options of execution provider",            OFFSET(ep_name),  AV_OPT_TYPE_STRING,    { .str = "VitisAI" }, 0, 0, FLAGS },\
     //{ "input",              "input name of the model",    OFFSET(model_inputname),  AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },\
     //{ "output",             "output name of the model",   OFFSET(model_outputnames_string), AV_OPT_TYPE_STRING, { .str = NULL }, 0, 0, FLAGS },\
     { "backend_configs",    "backend configs",            OFFSET(backend_options),  AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },\

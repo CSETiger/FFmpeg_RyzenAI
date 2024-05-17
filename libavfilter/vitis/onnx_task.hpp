@@ -62,19 +62,23 @@ static std::string print_shape(const std::vector<int64_t>& v) {
 
 class OnnxTask {
  public:
-  explicit OnnxTask(const std::string& model_name)
+  explicit OnnxTask(const std::string& model_name, const std::string& ep_name)
       : model_name_(model_name),
         env_(ORT_LOGGING_LEVEL_WARNING, model_name_.c_str()),
         session_options_(Ort::SessionOptions()) {
     
-    
-    auto options = std::unordered_map<std::string,std::string>({});
-    options["config_file"] = "../vaip_config.json";
-    // optional, eg: cache path and cache key: /tmp/my_cache/abcdefg
-    // options["CacheDir"] = "/tmp/my_cache";
-    // options["CacheKey"] = "abcdefg";
-    
-    session_options_.AppendExecutionProvider("VitisAI", options );
+    if (ep_name.compare("VitisAI") == 0) {
+      auto options = std::unordered_map<std::string,std::string>({});
+      options["config_file"] = "../vaip_config.json";
+      // optional, eg: cache path and cache key: /tmp/my_cache/abcdefg
+      // options["CacheDir"] = "/tmp/my_cache";
+      // options["CacheKey"] = "abcdefg";
+      
+      session_options_.AppendExecutionProvider("VitisAI", options );
+    }
+    else if(ep_name.compare("DML") == 0) {
+      session_options_.AppendExecutionProvider_DML(0);
+    }
 
 
     if (onnx_x > 0) {
