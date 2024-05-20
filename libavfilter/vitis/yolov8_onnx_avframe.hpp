@@ -106,9 +106,9 @@ static void letterbox(const cv::Mat input_image, cv::Mat& output_image,
                       int& left, int& top) {
   cv::Mat image_tmp;
 
-  scale = std::min(float(width) / input_image.cols,
+  scale = min(float(width) / input_image.cols,
                    float(height) / input_image.rows);
-  scale = std::min(scale, 1.0f);
+  scale = min(scale, 1.0f);
   int unpad_w = round(input_image.cols * scale);
   int unpad_h = round(input_image.rows * scale);
   image_tmp = input_image.clone();
@@ -304,7 +304,7 @@ void Yolov8Onnx::preprocess(const cv::Mat& image, int idx, float& scale,
 
 // preprocess
 void Yolov8Onnx::preprocess(const std::vector<cv::Mat>& mats) {
-  real_batch = std::min((int)input_shapes_[0][0], (int)mats.size());
+  real_batch = min((int)input_shapes_[0][0], (int)mats.size());
   scales.resize(real_batch);
   left.resize(real_batch);
   top.resize(real_batch);

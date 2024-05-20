@@ -23,9 +23,10 @@
 #include <stdlib.h>
 // #include <stdint.h>
 #include <string.h>
+#include "dml_provider_factory.h"
 #if _WIN32
 extern "C" {
-#  include "util/getopt.h"
+#include "util/getopt.h"
 }
 #  include <codecvt>
 #  include <locale>
@@ -33,6 +34,8 @@ using convert_t = std::codecvt_utf8<wchar_t>;
 std::wstring_convert<convert_t, wchar_t> strconverter;
 #endif
 
+#define THROW_IF_NOT_OK(status) {auto localStatus = (status); if (localStatus) throw E_FAIL;}
+constexpr GraphOptimizationLevel GRAPH_OPTIMIZATION_LEVEL = GraphOptimizationLevel::ORT_ENABLE_ALL;
 //DEF_ENV_PARAM(DEBUG_ONNX_TASK, "0")
 
 extern int onnx_x = -1;
@@ -77,7 +80,16 @@ class OnnxTask {
       session_options_.AppendExecutionProvider("VitisAI", options );
     }
     else if(ep_name.compare("DML") == 0) {
-      session_options_.AppendExecutionProvider_DML(0);
+      OrtApi const& ortApi = Ort::GetApi(); // Uses ORT_API_VERSION
+      const OrtDmlApi* ortDmlApi;
+      THROW_IF_NOT_OK(ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)));
+
+      Ort::Env ortEnvironment(ORT_LOGGING_LEVEL_WARNING, "Onnx DirectML"); 
+      session_options_.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+      session_options_.DisableMemPattern();
+      session_options_.SetGraphOptimizationLevel(GRAPH_OPTIMIZATION_LEVEL);
+
+      ortDmlApi->SessionOptionsAppendExecutionProvider_DML(session_options_, /*device index*/ 0);
     }
 
 
