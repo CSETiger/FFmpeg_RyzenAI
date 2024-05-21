@@ -23,7 +23,8 @@
 #include <stdlib.h>
 // #include <stdint.h>
 #include <string.h>
-#include "dml_provider_factory.h"
+#include "core/session/dml_provider_factory.h"
+#include "avfilter.h"
 #if _WIN32
 extern "C" {
 #include "util/getopt.h"
@@ -80,15 +81,23 @@ class OnnxTask {
       session_options_.AppendExecutionProvider("VitisAI", options );
     }
     else if(ep_name.compare("DML") == 0) {
+
+      av_log(NULL, AV_LOG_INFO, "OnnxTask: DML EP ------->\n");
+
       OrtApi const& ortApi = Ort::GetApi(); // Uses ORT_API_VERSION
       const OrtDmlApi* ortDmlApi;
-      THROW_IF_NOT_OK(ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)));
+      //THROW_IF_NOT_OK(ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)));
+      if (ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)) != nullptr){
+        av_log(NULL, AV_LOG_INFO, "OnnxTask: GetEP failed---\n");
+      }
+
+      av_log(NULL, AV_LOG_INFO, "OnnxTask: GetEP -------\n");
 
       Ort::Env ortEnvironment(ORT_LOGGING_LEVEL_WARNING, "Onnx DirectML"); 
       session_options_.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
       session_options_.DisableMemPattern();
       session_options_.SetGraphOptimizationLevel(GRAPH_OPTIMIZATION_LEVEL);
-
+      av_log(NULL, AV_LOG_INFO, "OnnxTask: AppendEP_DML -------\n");
       ortDmlApi->SessionOptionsAppendExecutionProvider_DML(session_options_, /*device index*/ 0);
     }
 

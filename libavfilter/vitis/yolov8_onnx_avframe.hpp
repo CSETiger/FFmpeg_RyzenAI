@@ -210,6 +210,7 @@ class Yolov8Onnx : public OnnxTask {
                                             const float conf_thresh_,
                                             const std::string& ep_name) {
     // cout << "create" << endl;
+    av_log(NULL, AV_LOG_INFO, "Yolov8Onnx->create with ep:%s ------>\n",ep_name.c_str());
     return std::unique_ptr<Yolov8Onnx>(
         new Yolov8Onnx(model_name, conf_thresh_, ep_name));
   }
