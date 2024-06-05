@@ -88,7 +88,7 @@ class OnnxTask {
       const OrtDmlApi* ortDmlApi;
       //THROW_IF_NOT_OK(ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)));
       if (ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)) != nullptr){
-        av_log(NULL, AV_LOG_INFO, "OnnxTask: GetEP failed---\n");
+        av_log(NULL, AV_LOG_ERROR, "OnnxTask: GetEP failed---\n");
       }
 
       av_log(NULL, AV_LOG_INFO, "OnnxTask: GetEP -------\n");

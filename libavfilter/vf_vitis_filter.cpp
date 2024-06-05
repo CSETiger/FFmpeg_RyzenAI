@@ -94,7 +94,7 @@ av_cold int vitis_filter_init(AVFilterContext *context)
         av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create model\n");
         return -1;
     }
-    av_log(NULL, AV_LOG_ERROR, "vitis filter: model created\n");
+    av_log(NULL, AV_LOG_INFO, "vitis filter: model created\n");
     Yolov8OnnxModel = std::move(model);
 
     return 0;
