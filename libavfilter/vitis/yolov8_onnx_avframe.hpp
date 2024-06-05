@@ -106,9 +106,9 @@ static void letterbox(const cv::Mat input_image, cv::Mat& output_image,
                       int& left, int& top) {
   cv::Mat image_tmp;
 
-  scale = std::min(float(width) / input_image.cols,
+  scale = min(float(width) / input_image.cols,
                    float(height) / input_image.rows);
-  scale = std::min(scale, 1.0f);
+  scale = min(scale, 1.0f);
   int unpad_w = round(input_image.cols * scale);
   int unpad_h = round(input_image.rows * scale);
   image_tmp = input_image.clone();
@@ -207,14 +207,16 @@ struct Yolov8OnnxResult {
 class Yolov8Onnx : public OnnxTask {
  public:
   static std::unique_ptr<Yolov8Onnx> create(const std::string& model_name,
-                                            const float conf_thresh_) {
+                                            const float conf_thresh_,
+                                            const std::string& ep_name) {
     // cout << "create" << endl;
+    av_log(NULL, AV_LOG_INFO, "Yolov8Onnx->create with ep:%s ------>\n",ep_name.c_str());
     return std::unique_ptr<Yolov8Onnx>(
-        new Yolov8Onnx(model_name, conf_thresh_));
+        new Yolov8Onnx(model_name, conf_thresh_, ep_name));
   }
 
  protected:
-  explicit Yolov8Onnx(const std::string& model_name, const float conf_thresh_);
+  explicit Yolov8Onnx(const std::string& model_name, const float conf_thresh_, const std::string& ep_name);
   Yolov8Onnx(const Yolov8Onnx&) = delete;
 
  public:
@@ -303,7 +305,7 @@ void Yolov8Onnx::preprocess(const cv::Mat& image, int idx, float& scale,
 
 // preprocess
 void Yolov8Onnx::preprocess(const std::vector<cv::Mat>& mats) {
-  real_batch = std::min((int)input_shapes_[0][0], (int)mats.size());
+  real_batch = min((int)input_shapes_[0][0], (int)mats.size());
   scales.resize(real_batch);
   left.resize(real_batch);
   top.resize(real_batch);
@@ -451,8 +453,8 @@ static int calculate_product(const std::vector<int64_t>& v) {
   return total;
 }
 
-Yolov8Onnx::Yolov8Onnx(const std::string& model_name, const float conf_thresh_)
-    : OnnxTask(model_name) {
+Yolov8Onnx::Yolov8Onnx(const std::string& model_name, const float conf_thresh_, const std::string& ep_name)
+    : OnnxTask(model_name, ep_name) {
   int total_number_elements = calculate_product(input_shapes_[0]);
   // cout << total_number_elements << endl; 
   std::vector<float> input_tensor_values_(total_number_elements);

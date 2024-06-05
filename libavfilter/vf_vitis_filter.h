@@ -19,6 +19,7 @@ typedef struct DnnContext {
     char *model_inputname;
     char *model_outputnames_string;
     char *backend_options;
+    char *ep_name;
     //int async;
 
     char **model_outputnames;

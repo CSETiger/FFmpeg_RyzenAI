@@ -23,9 +23,11 @@
 #include <stdlib.h>
 // #include <stdint.h>
 #include <string.h>
+#include "core/session/dml_provider_factory.h"
+#include "avfilter.h"
 #if _WIN32
 extern "C" {
-#  include "util/getopt.h"
+#include "util/getopt.h"
 }
 #  include <codecvt>
 #  include <locale>
@@ -33,6 +35,8 @@ using convert_t = std::codecvt_utf8<wchar_t>;
 std::wstring_convert<convert_t, wchar_t> strconverter;
 #endif
 
+#define THROW_IF_NOT_OK(status) {auto localStatus = (status); if (localStatus) throw E_FAIL;}
+constexpr GraphOptimizationLevel GRAPH_OPTIMIZATION_LEVEL = GraphOptimizationLevel::ORT_ENABLE_ALL;
 //DEF_ENV_PARAM(DEBUG_ONNX_TASK, "0")
 
 extern int onnx_x = -1;
@@ -62,19 +66,40 @@ static std::string print_shape(const std::vector<int64_t>& v) {
 
 class OnnxTask {
  public:
-  explicit OnnxTask(const std::string& model_name)
+  explicit OnnxTask(const std::string& model_name, const std::string& ep_name)
       : model_name_(model_name),
         env_(ORT_LOGGING_LEVEL_WARNING, model_name_.c_str()),
         session_options_(Ort::SessionOptions()) {
     
-    
-    auto options = std::unordered_map<std::string,std::string>({});
-    options["config_file"] = "../vaip_config.json";
-    // optional, eg: cache path and cache key: /tmp/my_cache/abcdefg
-    // options["CacheDir"] = "/tmp/my_cache";
-    // options["CacheKey"] = "abcdefg";
-    
-    session_options_.AppendExecutionProvider("VitisAI", options );
+    if (ep_name.compare("VitisAI") == 0) {
+      auto options = std::unordered_map<std::string,std::string>({});
+      options["config_file"] = "../vaip_config.json";
+      // optional, eg: cache path and cache key: /tmp/my_cache/abcdefg
+      // options["CacheDir"] = "/tmp/my_cache";
+      // options["CacheKey"] = "abcdefg";
+      
+      session_options_.AppendExecutionProvider("VitisAI", options );
+    }
+    else if(ep_name.compare("DML") == 0) {
+
+      av_log(NULL, AV_LOG_INFO, "OnnxTask: DML EP ------->\n");
+
+      OrtApi const& ortApi = Ort::GetApi(); // Uses ORT_API_VERSION
+      const OrtDmlApi* ortDmlApi;
+      //THROW_IF_NOT_OK(ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)));
+      if (ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)) != nullptr){
+        av_log(NULL, AV_LOG_ERROR, "OnnxTask: GetEP failed---\n");
+      }
+
+      av_log(NULL, AV_LOG_INFO, "OnnxTask: GetEP -------\n");
+
+      Ort::Env ortEnvironment(ORT_LOGGING_LEVEL_WARNING, "Onnx DirectML"); 
+      session_options_.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+      session_options_.DisableMemPattern();
+      session_options_.SetGraphOptimizationLevel(GRAPH_OPTIMIZATION_LEVEL);
+      av_log(NULL, AV_LOG_INFO, "OnnxTask: AppendEP_DML -------\n");
+      ortDmlApi->SessionOptionsAppendExecutionProvider_DML(session_options_, /*device index*/ 0);
+    }
 
 
     if (onnx_x > 0) {
