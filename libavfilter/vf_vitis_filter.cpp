@@ -41,6 +41,7 @@ extern "C"{
 #pragma comment(lib, "onnxruntime_providers_shared.lib") 
 
 #include "vitis/yolov8_onnx_avframe.hpp"
+#include "vitis/faceswap_onnx.hpp"
 
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -96,6 +97,10 @@ av_cold int vitis_filter_init(AVFilterContext *context)
     }
     av_log(NULL, AV_LOG_INFO, "vitis filter: model created\n");
     Yolov8OnnxModel = std::move(model);
+
+    //faceswap
+    faceswap_load_models();
+    faceswap_detect_src();
 
     return 0;
 }
@@ -156,7 +161,9 @@ int vitis_filter_activate(AVFilterContext *filter_ctx)
         
         __TIC__(SHOW)
         vitis_filter_process_result(images[0], results[0]);
-        //cv::imshow("yolov8-camera", images[0]);
+        
+        faceswap_process(images[0]);//process face swapping
+
         __TOC__(SHOW)
         av_log(NULL, AV_LOG_INFO, "vitis filter: cvmatToAvframe begin\n");
         out_frame = cvmatToAvframe(&images[0],in_frame);
