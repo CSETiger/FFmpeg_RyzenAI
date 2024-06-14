@@ -13,6 +13,7 @@
 
 #define OFFSET(x) offsetof(VitisFilterContext, dnnctx.x)
 #define OFFSET2(x) offsetof(VitisFilterContext, x)
+#define OFFSET3(x) offsetof(VitisFilterContext, faceswapctx.x)
 #define FLAGS AV_OPT_FLAG_FILTERING_PARAM | AV_OPT_FLAG_VIDEO_PARAM
 
 #define RYZENAI_OPTIONS \
@@ -27,6 +28,8 @@
 static const AVOption vitis_filter_options[] = {
     RYZENAI_OPTIONS
     { "confidence",  "threshold of confidence",    OFFSET2(confidence),      AV_OPT_TYPE_FLOAT,     { .dbl = 0.3 },  0, 1, FLAGS},
+    { "facemodelpath",   "path to models of Face AI",         OFFSET3(modelpath),   AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },
+    { "sourceimg",       "path to source image file",         OFFSET3(source_image),   AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },
     //{ "labels",      "path to labels file",        OFFSET2(labels_filename), AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },
     //{ "target",      "which one to be classified", OFFSET2(target),          AV_OPT_TYPE_STRING,    { .str = NULL }, 0, 0, FLAGS },
     { NULL }

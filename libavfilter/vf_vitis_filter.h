@@ -46,11 +46,17 @@ typedef struct Yolov8_Ctx {
     uint32_t nb_outputs;
 } Yolov8_Ctx;
 
+typedef struct FaceSwap_Ctx {
+    char *modelpath;
+    char *source_image;
+} FaceSwap_Ctx;
+
 typedef struct VitisFilterContext {
     const AVClass *cclass;
     DnnContext dnnctx;
     Yolov3_Ctx yolov3ctx;
     Yolov8_Ctx yolov8ctx;
+    FaceSwap_Ctx faceswapctx;
     float confidence;
     //void* model;
     char *labels_filename;

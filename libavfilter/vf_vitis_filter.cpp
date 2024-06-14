@@ -99,8 +99,10 @@ av_cold int vitis_filter_init(AVFilterContext *context)
     Yolov8OnnxModel = std::move(model);
 
     //faceswap
-    faceswap_load_models();
-    faceswap_detect_src();
+    char* facemodelpath = ctx->faceswapctx.modelpath;
+    char* sourceimg = ctx->faceswapctx.source_image;
+    faceswap_load_models(facemodelpath);
+    faceswap_detect_src(sourceimg);
 
     return 0;
 }
