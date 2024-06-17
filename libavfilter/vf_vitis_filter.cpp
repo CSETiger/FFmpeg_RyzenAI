@@ -32,8 +32,6 @@ extern "C"{
     #include "libavutil/detection_bbox.h"
     #include "vf_vitis_filter.h"
 }
-//#include <iostream>
-
 
 #pragma comment(lib, "glog.lib") 
 #pragma comment(lib, "opencv_world490.lib") 
@@ -55,6 +53,7 @@ extern "C"{
 using namespace cv;
 
 std::unique_ptr<Yolov8Onnx> Yolov8OnnxModel;
+std::unique_ptr<faceswap_onnx> FaceSwapOnnx;
 
 extern "C"{
 void vitis_filter_process_result(cv::Mat& image, const Yolov8OnnxResult& result) {
@@ -79,7 +78,6 @@ void vitis_filter_process_result(cv::Mat& image, const Yolov8OnnxResult& result)
 
 av_cold int vitis_filter_init(AVFilterContext *context)
 {
-    //auto model;
     av_log(NULL, AV_LOG_INFO, "vitis filter: vitis_filter_init entering---->\n");
 
     VitisFilterContext *ctx = (VitisFilterContext *)context->priv;
@@ -101,8 +99,9 @@ av_cold int vitis_filter_init(AVFilterContext *context)
     //faceswap
     char* facemodelpath = ctx->faceswapctx.modelpath;
     char* sourceimg = ctx->faceswapctx.source_image;
-    faceswap_load_models(facemodelpath);
-    faceswap_detect_src(sourceimg);
+    FaceSwapOnnx = faceswap_onnx::create(facemodelpath);
+    //faceswap_load_models(facemodelpath);
+    FaceSwapOnnx->faceswap_detect_src(std::string(sourceimg));
 
     return 0;
 }
@@ -164,7 +163,7 @@ int vitis_filter_activate(AVFilterContext *filter_ctx)
         __TIC__(SHOW)
         vitis_filter_process_result(images[0], results[0]);
         
-        faceswap_process(images[0]);//process face swapping
+        FaceSwapOnnx->faceswap_process(images[0]);//process face swapping
 
         __TOC__(SHOW)
         av_log(NULL, AV_LOG_INFO, "vitis filter: cvmatToAvframe begin\n");
@@ -182,23 +181,6 @@ int vitis_filter_activate(AVFilterContext *filter_ctx)
         ff_inlink_request_frame(inlink);
     }
 
-    /* // drain all processed frames
-    do {
-        AVFrame *in_frame = NULL;
-        AVFrame *out_frame = NULL;
-        async_state = ff_vitis_get_result(&ctx->dnnctx, &in_frame, &out_frame);
-        if (async_state == DAST_SUCCESS) {
-            ret = ff_filter_frame(outlink, in_frame);
-            if (ret < 0)
-                return ret;
-            got_frame = 1;
-        }
-    } while (async_state == DAST_SUCCESS);
-
-    // if frame got, schedule to next filter
-    if (got_frame)
-        return 0;
-    */
     if (ff_inlink_acknowledge_status(inlink, &status, &pts)) {
         if (status == AVERROR_EOF) {
             //int64_t out_pts = pts;
@@ -221,7 +203,6 @@ av_cold void vitis_filter_uninit(AVFilterContext *context)
     if (Yolov8OnnxModel){
         auto model = Yolov8OnnxModel.release();
     }
-        //Yolov8Onnx((Yolov8Onnx*)ctx->model);
 }
 
 } //extern "C"

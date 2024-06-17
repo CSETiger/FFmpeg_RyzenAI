@@ -26,9 +26,6 @@
 #include "core/session/dml_provider_factory.h"
 #include "avfilter.h"
 #if _WIN32
-extern "C" {
-#include "util/getopt.h"
-}
 #  include <codecvt>
 #  include <locale>
 using convert_t = std::codecvt_utf8<wchar_t>;

@@ -1,9 +1,16 @@
 # ifndef UTILS
 # define UTILS
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <algorithm>
 #include <vector>
 #include "opencv2/opencv.hpp"
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+
+#include <core/session/experimental_onnxruntime_cxx_api.h>
+#include <core/session/dml_provider_factory.h>
 
 typedef struct
 {

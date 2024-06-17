@@ -1,9 +1,6 @@
 # ifndef FACERECOGNIZER
 # define FACERECOGNIZER
-#include <fstream>
-#include <sstream>
-//#include <cuda_provider_factory.h>  ///如果使用cuda加速，需要取消注释
-#include <onnxruntime_cxx_api.h>
+
 #include"utils.h"
 
 

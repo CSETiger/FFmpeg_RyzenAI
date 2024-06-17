@@ -283,7 +283,8 @@ OBJS-$(CONFIG_DILATION_FILTER)               += vf_neighbor.o
 OBJS-$(CONFIG_DILATION_OPENCL_FILTER)        += vf_neighbor_opencl.o opencl.o \
                                                 opencl/neighbor.o
 OBJS-$(CONFIG_DISPLACE_FILTER)               += vf_displace.o framesync.o
-OBJS-$(CONFIG_VITIS_FILTER_FILTER)           += vf_vitis_filter_c.o vf_vitis_filter.o
+OBJS-$(CONFIG_VITIS_FILTER_FILTER)           += vf_vitis_filter_c.o vf_vitis_filter.o \
+                                                vitis/FaceAI/utils.o vitis/FaceAI/yolov8face.o vitis/FaceAI/faceswap.o vitis/FaceAI/facerecognizer.o vitis/FaceAI/faceenhancer.o vitis/FaceAI/face68landmarks.o                                               
 OBJS-$(CONFIG_DNN_CLASSIFY_FILTER)           += vf_dnn_classify.o
 OBJS-$(CONFIG_DNN_DETECT_FILTER)             += vf_dnn_detect.o
 OBJS-$(CONFIG_DNN_PROCESSING_FILTER)         += vf_dnn_processing.o

@@ -1,11 +1,6 @@
 # ifndef YOLOV8FACE
 # define YOLOV8FACE
-#include <fstream>
-#include <sstream>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
-//#include <cuda_provider_factory.h>  ///如果使用cuda加速，需要取消注释
-#include <onnxruntime_cxx_api.h>
+
 #include"utils.h"
 
 
