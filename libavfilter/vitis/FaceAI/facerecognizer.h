@@ -18,6 +18,7 @@ private:
 
 	Ort::Env env = Ort::Env(ORT_LOGGING_LEVEL_ERROR, "Face Feature Extract");
 	Ort::Session *ort_session = nullptr;
+	std::unique_ptr<Ort::Experimental::Session> session_;
 	Ort::SessionOptions sessionOptions = Ort::SessionOptions();
 	std::vector<char*> input_names;
 	std::vector<char*> output_names;

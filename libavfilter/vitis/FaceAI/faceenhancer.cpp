@@ -6,22 +6,43 @@ using namespace Ort;
 
 FaceEnhance::FaceEnhance(string model_path)
 {
+    constexpr GraphOptimizationLevel GRAPH_OPTIMIZATION_LEVEL = GraphOptimizationLevel::ORT_ENABLE_ALL;
+    using convert_t = std::codecvt_utf8<wchar_t>;
+    std::wstring_convert<convert_t, wchar_t> strconverter2;
+     OrtApi const& ortApi = Ort::GetApi(); // Uses ORT_API_VERSION
+      const OrtDmlApi* ortDmlApi;
+      //THROW_IF_NOT_OK(ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)));
+      if (ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)) != nullptr){
+        printf("FaceEnhance GetEP failed----->\n");
+      }
+
+      printf("FaceEnhance GetEP done----->\n");
+
+      sessionOptions.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+      sessionOptions.DisableMemPattern();
+      sessionOptions.SetGraphOptimizationLevel(GRAPH_OPTIMIZATION_LEVEL);
+      
+      printf("FaceEnhance AppendEP_DML----->\n");
+      ortDmlApi->SessionOptionsAppendExecutionProvider_DML(sessionOptions, /*device index*/ 0);
+        auto model_name_basic = strconverter2.from_bytes(model_path);
+      session_.reset(
+        new Ort::Experimental::Session(env, model_name_basic, sessionOptions));
     /// OrtStatus* status = OrtSessionOptionsAppendExecutionProvider_CUDA(sessionOptions, 0);   ///如果使用cuda加速，需要取消注释
 
-    sessionOptions.SetGraphOptimizationLevel(ORT_ENABLE_BASIC);
+    /* sessionOptions.SetGraphOptimizationLevel(ORT_ENABLE_BASIC);
     std::wstring widestr = std::wstring(model_path.begin(), model_path.end());  ////windows写法
     ort_session = new Session(env, widestr.c_str(), sessionOptions); ////windows写法
     //ort_session = new Session(env, model_path.c_str(), sessionOptions); ////linux写法
-
-    size_t numInputNodes = ort_session->GetInputCount();
-    size_t numOutputNodes = ort_session->GetOutputCount();
+ */
+    size_t numInputNodes = session_->GetInputCount();
+    size_t numOutputNodes = session_->GetOutputCount();
     AllocatorWithDefaultOptions allocator;
     for (int i = 0; i < numInputNodes; i++)
     {
         //input_names.push_back(ort_session->GetInputName(i, allocator)); /// 低版本onnxruntime的接口函数
-        AllocatedStringPtr input_name_Ptr = ort_session->GetInputNameAllocated(i, allocator);  /// 高版本onnxruntime的接口函数
-        input_names.push_back(input_name_Ptr.get()); /// 高版本onnxruntime的接口函数
-        Ort::TypeInfo input_type_info = ort_session->GetInputTypeInfo(i);
+        //AllocatedStringPtr input_name_Ptr = ort_session->GetInputNameAllocated(i, allocator);  /// 高版本onnxruntime的接口函数
+        //input_names.push_back(input_name_Ptr.get()); /// 高版本onnxruntime的接口函数
+        Ort::TypeInfo input_type_info = session_->GetInputTypeInfo(i);
         auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();
         auto input_dims = input_tensor_info.GetShape();
         input_node_dims.push_back(input_dims);
@@ -29,9 +50,9 @@ FaceEnhance::FaceEnhance(string model_path)
     for (int i = 0; i < numOutputNodes; i++)
     {
         //output_names.push_back(ort_session->GetOutputName(i, allocator)); /// 低版本onnxruntime的接口函数
-        AllocatedStringPtr output_name_Ptr= ort_session->GetInputNameAllocated(i, allocator);
-        output_names.push_back(output_name_Ptr.get()); /// 高版本onnxruntime的接口函数
-        Ort::TypeInfo output_type_info = ort_session->GetOutputTypeInfo(i);
+        //AllocatedStringPtr output_name_Ptr= ort_session->GetInputNameAllocated(i, allocator);
+        //output_names.push_back(output_name_Ptr.get()); /// 高版本onnxruntime的接口函数
+        Ort::TypeInfo output_type_info = session_->GetOutputTypeInfo(i);
         auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
         auto output_dims = output_tensor_info.GetShape();
         output_node_dims.push_back(output_dims);
@@ -77,10 +98,24 @@ Mat FaceEnhance::process(Mat target_img, const vector<Point2f> target_landmark_5
     this->preprocess(target_img, target_landmark_5, affine_matrix, box_mask);
 
     std::vector<int64_t> input_img_shape = {1, 3, this->input_height, this->input_width};
-    Value input_tensor_ = Value::CreateTensor<float>(memory_info_handler, this->input_image.data(), this->input_image.size(), input_img_shape.data(), input_img_shape.size());
+    // Value input_tensor_ = Value::CreateTensor<float>(memory_info_handler, this->input_image.data(), this->input_image.size(), input_img_shape.data(), input_img_shape.size());
 
-    Ort::RunOptions runOptions;
-    vector<Value> ort_outputs = this->ort_session->Run(runOptions, this->input_names.data(), &input_tensor_, 1, this->output_names.data(), output_names.size());
+    // Ort::RunOptions runOptions;
+    // vector<Value> ort_outputs = this->ort_session->Run(runOptions, this->input_names.data(), &input_tensor_, 1, this->output_names.data(), output_names.size());
+
+    std::vector<Ort::Value> input_tensor_;
+    std::vector<Ort::Value> ort_outputs;
+    
+    if (input_tensor_.size()) {
+    input_tensor_[0] = Ort::Experimental::Value::CreateTensor<float>(
+        input_image.data(), input_image.size(),
+        input_img_shape);
+    } else {
+        input_tensor_.push_back(Ort::Experimental::Value::CreateTensor<float>(
+            input_image.data(), input_image.size(),
+            input_img_shape));
+    }
+    ort_outputs = this->session_->Run(session_->GetInputNames(), input_tensor_, session_->GetOutputNames());
 
     float* pdata = ort_outputs[0].GetTensorMutableData<float>();
     std::vector<int64_t> outs_shape = ort_outputs[0].GetTensorTypeAndShapeInfo().GetShape();

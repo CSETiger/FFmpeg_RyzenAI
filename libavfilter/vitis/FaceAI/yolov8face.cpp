@@ -1,27 +1,47 @@
 #include "yolov8face.h"
 
-using namespace cv;
-using namespace std;
-using namespace Ort;
-
 Yolov8Face::Yolov8Face(string model_path, const float conf_thres, const float iou_thresh)
 {
+    constexpr GraphOptimizationLevel GRAPH_OPTIMIZATION_LEVEL = GraphOptimizationLevel::ORT_ENABLE_ALL;
+    using convert_t = std::codecvt_utf8<wchar_t>;
+    std::wstring_convert<convert_t, wchar_t> strconverter2;
     /// OrtStatus* status = OrtSessionOptionsAppendExecutionProvider_CUDA(sessionOptions, 0);   ///如果使用cuda加速，需要取消注释
+    printf("Yolov8Face entering----->\n");
+    // sessionOptions.SetGraphOptimizationLevel(ORT_ENABLE_BASIC);
+    // std::wstring widestr = std::wstring(model_path.begin(), model_path.end());  ////windows写法
+    // ort_session = new Session(env, widestr.c_str(), sessionOptions); ////windows写法
+    // //ort_session = new Session(env, model_path.c_str(), sessionOptions); ////linux写法
+    OrtApi const& ortApi = Ort::GetApi(); // Uses ORT_API_VERSION
+      const OrtDmlApi* ortDmlApi;
+      //THROW_IF_NOT_OK(ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)));
+      if (ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi)) != nullptr){
+        //av_log(NULL, AV_LOG_ERROR, "OnnxTask: GetEP failed---\n");
+        printf("Yolov8Face GetEP failed----->\n");
+      }
 
-    sessionOptions.SetGraphOptimizationLevel(ORT_ENABLE_BASIC);
-    std::wstring widestr = std::wstring(model_path.begin(), model_path.end());  ////windows写法
-    ort_session = new Session(env, widestr.c_str(), sessionOptions); ////windows写法
-    //ort_session = new Session(env, model_path.c_str(), sessionOptions); ////linux写法
+      //av_log(NULL, AV_LOG_INFO, "OnnxTask: GetEP -------\n");
+      printf("Yolov8Face GetEP done----->\n");
 
-    size_t numInputNodes = ort_session->GetInputCount();
-    size_t numOutputNodes = ort_session->GetOutputCount();
+      //Ort::Env ortEnvironment(ORT_LOGGING_LEVEL_WARNING, "Onnx DirectML"); 
+      sessionOptions.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+      sessionOptions.DisableMemPattern();
+      sessionOptions.SetGraphOptimizationLevel(GRAPH_OPTIMIZATION_LEVEL);
+      //av_log(NULL, AV_LOG_INFO, "OnnxTask: AppendEP_DML -------\n");
+      printf("Yolov8Face AppendEP_DML----->\n");
+      ortDmlApi->SessionOptionsAppendExecutionProvider_DML(sessionOptions, /*device index*/ 0);
+        auto model_name_basic = strconverter2.from_bytes(model_path);
+      session_.reset(
+        new Ort::Experimental::Session(env, model_name_basic, sessionOptions));
+        
+    size_t numInputNodes = session_->GetInputCount();
+    size_t numOutputNodes = session_->GetOutputCount();
     AllocatorWithDefaultOptions allocator;
     for (int i = 0; i < numInputNodes; i++)
     {
         //input_names.push_back(ort_session->GetInputName(i, allocator));      ///低版本onnxruntime的接口函数
-        AllocatedStringPtr input_name_Ptr = ort_session->GetInputNameAllocated(i, allocator);  /// 高版本onnxruntime的接口函数
-        input_names.push_back(input_name_Ptr.get()); /// 高版本onnxruntime的接口函数
-        Ort::TypeInfo input_type_info = ort_session->GetInputTypeInfo(i);
+        ////AllocatedStringPtr input_name_Ptr = ort_session->GetInputNameAllocated(i, allocator);  /// 高版本onnxruntime的接口函数
+        ////input_names.push_back(input_name_Ptr.get()); /// 高版本onnxruntime的接口函数
+        Ort::TypeInfo input_type_info = session_->GetInputTypeInfo(i);
         auto input_tensor_info = input_type_info.GetTensorTypeAndShapeInfo();
         auto input_dims = input_tensor_info.GetShape();
         input_node_dims.push_back(input_dims);
@@ -29,9 +49,9 @@ Yolov8Face::Yolov8Face(string model_path, const float conf_thres, const float io
     for (int i = 0; i < numOutputNodes; i++)
     {
         //output_names.push_back(ort_session->GetOutputName(i, allocator));  ///低版本onnxruntime的接口函数
-        AllocatedStringPtr output_name_Ptr= ort_session->GetInputNameAllocated(i, allocator);
-        output_names.push_back(output_name_Ptr.get()); /// 高版本onnxruntime的接口函数
-        Ort::TypeInfo output_type_info = ort_session->GetOutputTypeInfo(i);
+        ////AllocatedStringPtr output_name_Ptr= ort_session->GetInputNameAllocated(i, allocator);
+        ////output_names.push_back(output_name_Ptr.get()); /// 高版本onnxruntime的接口函数
+        Ort::TypeInfo output_type_info = session_->GetOutputTypeInfo(i);
         auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
         auto output_dims = output_tensor_info.GetShape();
         output_node_dims.push_back(output_dims);
@@ -80,10 +100,23 @@ void Yolov8Face::detect(Mat srcimg, std::vector<Bbox> &boxes)
     this->preprocess(srcimg);
 
     std::vector<int64_t> input_img_shape = {1, 3, this->input_height, this->input_width};
-    Value input_tensor_ = Value::CreateTensor<float>(memory_info_handler, this->input_image.data(), this->input_image.size(), input_img_shape.data(), input_img_shape.size());
+    //std::vector<float> input_tensor_values;
+    std::vector<Ort::Value> input_tensor_;
+    std::vector<Ort::Value> ort_outputs;
+    //Value input_tensor_ = Value::CreateTensor<float>(memory_info_handler, this->input_image.data(), this->input_image.size(), input_img_shape.data(), input_img_shape.size());
+    if (input_tensor_.size()) {
+    input_tensor_[0] = Ort::Experimental::Value::CreateTensor<float>(
+        input_image.data(), input_image.size(),
+        input_img_shape);
+    } else {
+        input_tensor_.push_back(Ort::Experimental::Value::CreateTensor<float>(
+            input_image.data(), input_image.size(),
+            input_img_shape));
+    }
 
-    Ort::RunOptions runOptions;
-    vector<Value> ort_outputs = this->ort_session->Run(runOptions, this->input_names.data(), &input_tensor_, 1, this->output_names.data(), output_names.size());
+    //Ort::RunOptions runOptions;
+    //vector<Value> ort_outputs = this->ort_session->Run(runOptions, this->input_names.data(), &input_tensor_, 1, this->output_names.data(), output_names.size());
+    ort_outputs = this->session_->Run(session_->GetInputNames(), input_tensor_, session_->GetOutputNames());
 
     float *pdata = ort_outputs[0].GetTensorMutableData<float>(); /// 形状是(1, 20, 8400),不考虑第0维batchsize，每一列的长度20,前4个元素是检测框坐标(cx,cy,w,h)，第4个元素是置信度，剩下的15个元素是5个关键点坐标x,y和置信度
     const int num_box = ort_outputs[0].GetTensorTypeAndShapeInfo().GetShape()[2];

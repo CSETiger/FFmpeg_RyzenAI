@@ -9,8 +9,23 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 
+#include <core/session/onnxruntime_cxx_api.h>
 #include <core/session/experimental_onnxruntime_cxx_api.h>
 #include <core/session/dml_provider_factory.h>
+
+#  include <codecvt>
+#  include <locale>
+
+using namespace cv;
+using namespace std;
+using namespace Ort;
+
+// #define GLOG_USE_GLOG_EXPORT
+// #define GOOGLE_GLOG_DLL_DECL
+// #define GLOG_NO_ABBREVIATED_SEVERITIES
+// //#include <glog/logging.h>
+
+// #include "../onnx_task.hpp"
 
 typedef struct
 {

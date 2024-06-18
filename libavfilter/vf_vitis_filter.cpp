@@ -86,22 +86,35 @@ av_cold int vitis_filter_init(AVFilterContext *context)
     char* ep_name = ctx->dnnctx.ep_name;
     //load models and create filters
     //std::cout << "load model " << argv[1] << endl;
-    av_log(NULL, AV_LOG_INFO, "vitis filter::model_name:%s ep_name:%s\n",model_name, ep_name);
+/*     av_log(NULL, AV_LOG_INFO, "vitis filter::model_name:%s ep_name:%s\n",model_name, ep_name);
     auto model = Yolov8Onnx::create(std::string(model_name), ctx->confidence, std::string(ep_name));
     //ctx->model = model.get();
     if (!model) {  // supress coverity complain
-        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create model\n");
+        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create yolov8 model\n");
         return -1;
     }
-    av_log(NULL, AV_LOG_INFO, "vitis filter: model created\n");
-    Yolov8OnnxModel = std::move(model);
+    av_log(NULL, AV_LOG_INFO, "vitis filter: yolov8 model created\n");
+    Yolov8OnnxModel = std::move(model); */
 
     //faceswap
+    FaceSwapOnnx = nullptr;
     char* facemodelpath = ctx->faceswapctx.modelpath;
     char* sourceimg = ctx->faceswapctx.source_image;
-    FaceSwapOnnx = faceswap_onnx::create(facemodelpath);
-    //faceswap_load_models(facemodelpath);
+    av_log(NULL, AV_LOG_INFO, "vitis filter: begin create face ai modelpath=%s, sourceimg=%s\n", facemodelpath, sourceimg);
+    FaceSwapOnnx = faceswap_onnx::create(std::string(facemodelpath));
+    if (!FaceSwapOnnx){
+        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create face_ai models\n");
+        return -1;
+    }
+    av_log(NULL, AV_LOG_INFO, "vitis filter: create face_ai succeeded!\n");
+    int res = FaceSwapOnnx->faceswap_loadmodels();
+    if (res < 0){
+        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create faceai models with errorcode:%d\n", res);
+        FaceSwapOnnx->faceswap_unloadmodels();
+        return -res;
+    }
     FaceSwapOnnx->faceswap_detect_src(std::string(sourceimg));
+    av_log(NULL, AV_LOG_INFO, "vitis filter: detected source face for faceswap!\n");
 
     return 0;
 }
@@ -136,9 +149,9 @@ int vitis_filter_activate(AVFilterContext *filter_ctx)
     //load models and create filters
     //std::cout << "load model " << argv[1] << endl;
     //auto model = Yolov8Onnx::create(std::string(mode_name), ctx->confidence);
-    if (!Yolov8OnnxModel) {  // supress coverity complain
+    if ((!Yolov8OnnxModel) && (!FaceSwapOnnx)) {  // supress coverity complain
         //std::cout << "failed to create model\n";
-        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create model\n");
+        av_log(NULL, AV_LOG_ERROR, "vitis filter: no AI models created\n");
         return 0;
     }
 
@@ -153,22 +166,27 @@ int vitis_filter_activate(AVFilterContext *filter_ctx)
         //avframe to vitis tensor data
         av_log(NULL, AV_LOG_INFO, "vitis filter: avframeToCvmat\n");
         images[0] = avframeToCvmat(in_frame);
-
-        __TIC__(ONNX_RUN)
-        av_log(NULL, AV_LOG_INFO, "vitis filter: Yolov8OnnxModel->run(images) begin\n");
-        auto results = Yolov8OnnxModel->run(images);
-        av_log(NULL, AV_LOG_INFO, "vitis filter: Yolov8OnnxModel->run(images) end\n");
-        __TOC__(ONNX_RUN)
+        if (Yolov8OnnxModel)
+        {
+            __TIC__(ONNX_RUN)
+            av_log(NULL, AV_LOG_INFO, "vitis filter: Yolov8OnnxModel->run(images) begin\n");
+            auto results = Yolov8OnnxModel->run(images);
+            av_log(NULL, AV_LOG_INFO, "vitis filter: Yolov8OnnxModel->run(images) end\n");
+            __TOC__(ONNX_RUN)
+            
+            __TIC__(SHOW)
+            vitis_filter_process_result(images[0], results[0]);
+            __TOC__(SHOW)
+        }
         
-        __TIC__(SHOW)
-        vitis_filter_process_result(images[0], results[0]);
-        
-        FaceSwapOnnx->faceswap_process(images[0]);//process face swapping
+        if (FaceSwapOnnx){
+            FaceSwapOnnx->faceswap_process(images[0]);//process face swapping
+        }
 
-        __TOC__(SHOW)
         av_log(NULL, AV_LOG_INFO, "vitis filter: cvmatToAvframe begin\n");
         out_frame = cvmatToAvframe(&images[0],in_frame);
         av_log(NULL, AV_LOG_INFO, "vitis filter: cvmatToAvframe end\n");
+
         ret = ff_filter_frame(outlink, out_frame);
         av_log(NULL, AV_LOG_INFO, "vitis filter: ff_filter_frame return %d\n",ret);
         if (ret < 0){
@@ -199,9 +217,13 @@ int vitis_filter_activate(AVFilterContext *filter_ctx)
 av_cold void vitis_filter_uninit(AVFilterContext *context)
 {
     av_log(NULL, AV_LOG_INFO, "vitis filter: vitis_filter_uninit entering---->\n");
-    VitisFilterContext *ctx = (VitisFilterContext *)context->priv;
+    //VitisFilterContext *ctx = (VitisFilterContext *)context->priv;
     if (Yolov8OnnxModel){
         auto model = Yolov8OnnxModel.release();
+    }
+
+    if (FaceSwapOnnx){
+        FaceSwapOnnx->faceswap_unloadmodels();
     }
 }
 
