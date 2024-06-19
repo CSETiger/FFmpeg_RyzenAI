@@ -134,6 +134,11 @@ int faceswap_onnx::faceswap_detect_src(string& source_image)
     cv::Mat source_img = imread(source_image);
 
 	detect_face_net->detect(source_img, boxes);
+    if (!boxes.size()) {
+        printf("faceswap_onnx::faceswap_detect_src no faces found in source image!\n");
+        return -1;
+    }
+        
 	int position = 0; ////一张图片里可能有多个人脸，这里只考虑1个人脸的情况
 
 	face68landmarks = detect_68landmarks_net->detect(source_img, boxes[position], face_landmark_5of68);
@@ -144,7 +149,17 @@ int faceswap_onnx::faceswap_detect_src(string& source_image)
 
 int faceswap_onnx::faceswap_process(cv::Mat& target_img)
 {    
+    if (!source_face_embedding.size()) {
+        //printf("faceswap_onnx::faceswap_detect_src skipping!\n");
+        return -1;
+    }
+
 	detect_face_net->detect(target_img, boxes);
+    if (!boxes.size()) {
+        //printf("faceswap_onnx::faceswap_process no faces found in target image!\n");
+        return -1;
+    }
+
 	int position = 0; ////一张图片里可能有多个人脸，这里只考虑1个人脸的情况
 	
 	detect_68landmarks_net->detect(target_img, boxes[position], target_landmark_5);

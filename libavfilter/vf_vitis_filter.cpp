@@ -111,9 +111,16 @@ av_cold int vitis_filter_init(AVFilterContext *context)
     if (res < 0){
         av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create faceai models with errorcode:%d\n", res);
         FaceSwapOnnx->faceswap_unloadmodels();
+        FaceSwapOnnx.release();
         return -res;
     }
-    FaceSwapOnnx->faceswap_detect_src(std::string(sourceimg));
+    res = FaceSwapOnnx->faceswap_detect_src(std::string(sourceimg));
+    if (res < 0){
+        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to detect face from source image errorcode:%d\n", res);
+        FaceSwapOnnx->faceswap_unloadmodels();
+        FaceSwapOnnx.release();
+        return -res;
+    }
     av_log(NULL, AV_LOG_INFO, "vitis filter: detected source face for faceswap!\n");
 
     return 0;
@@ -224,6 +231,7 @@ av_cold void vitis_filter_uninit(AVFilterContext *context)
 
     if (FaceSwapOnnx){
         FaceSwapOnnx->faceswap_unloadmodels();
+        FaceSwapOnnx.release();
     }
 }
 
