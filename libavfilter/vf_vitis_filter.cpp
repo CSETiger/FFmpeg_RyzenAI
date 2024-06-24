@@ -97,32 +97,37 @@ av_cold int vitis_filter_init(AVFilterContext *context)
     Yolov8OnnxModel = std::move(model); */
 
     //faceswap
-    FaceSwapOnnx = nullptr;
-    char* facemodelpath = ctx->faceswapctx.modelpath;
-    char* sourceimg = ctx->faceswapctx.source_image;
-    av_log(NULL, AV_LOG_INFO, "vitis filter: begin create face ai modelpath=%s, sourceimg=%s\n", facemodelpath, sourceimg);
-    FaceSwapOnnx = faceswap_onnx::create(std::string(facemodelpath));
     if (!FaceSwapOnnx){
-        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create face_ai models\n");
-        return -1;
+        //FaceSwapOnnx = nullptr;
+        char* facemodelpath = ctx->faceswapctx.modelpath;
+        char* sourceimg = ctx->faceswapctx.source_image;
+        av_log(NULL, AV_LOG_INFO, "vitis filter: begin create face ai modelpath=%s, sourceimg=%s\n", facemodelpath, sourceimg);
+        FaceSwapOnnx = faceswap_onnx::create(std::string(facemodelpath));
+        if (!FaceSwapOnnx){
+            av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create face_ai models\n");
+            return -1;
+        }
+        av_log(NULL, AV_LOG_INFO, "vitis filter: create face_ai succeeded!\n");
+        int res = FaceSwapOnnx->faceswap_loadmodels();
+        if (res < 0){
+            av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create faceai models with errorcode:%d\n", res);
+            FaceSwapOnnx->faceswap_unloadmodels();
+            FaceSwapOnnx.release();
+            return -res;
+        }
+        res = FaceSwapOnnx->faceswap_detect_src(std::string(sourceimg));
+        if (res < 0){
+            av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to detect face from source image errorcode:%d\n", res);
+            FaceSwapOnnx->faceswap_unloadmodels();
+            FaceSwapOnnx.release();
+            return -res;
+        }
+        av_log(NULL, AV_LOG_INFO, "vitis filter: detected source face for faceswap!\n");
     }
-    av_log(NULL, AV_LOG_INFO, "vitis filter: create face_ai succeeded!\n");
-    int res = FaceSwapOnnx->faceswap_loadmodels();
-    if (res < 0){
-        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to create faceai models with errorcode:%d\n", res);
-        FaceSwapOnnx->faceswap_unloadmodels();
-        FaceSwapOnnx.release();
-        return -res;
+    else{
+        av_log(NULL, AV_LOG_INFO, "vitis filter: FaceSwap already loaded!\n");
     }
-    res = FaceSwapOnnx->faceswap_detect_src(std::string(sourceimg));
-    if (res < 0){
-        av_log(NULL, AV_LOG_ERROR, "vitis filter: failed to detect face from source image errorcode:%d\n", res);
-        FaceSwapOnnx->faceswap_unloadmodels();
-        FaceSwapOnnx.release();
-        return -res;
-    }
-    av_log(NULL, AV_LOG_INFO, "vitis filter: detected source face for faceswap!\n");
-
+    
     return 0;
 }
 
@@ -229,10 +234,10 @@ av_cold void vitis_filter_uninit(AVFilterContext *context)
         auto model = Yolov8OnnxModel.release();
     }
 
-    if (FaceSwapOnnx){
+    /* if (FaceSwapOnnx){
         FaceSwapOnnx->faceswap_unloadmodels();
         FaceSwapOnnx.release();
-    }
+    } release model when application exit*/
 }
 
 } //extern "C"

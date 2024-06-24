@@ -6,9 +6,9 @@
             "request": "launch",
             "program": "C:/Users/tianwyan/Desktop/DMLtest/ffplay.exe",
             "args": ["-i","C:/Users/tianwyan/Desktop/DMLtest/oppenheimer.mp4", 
-            "-vf","vitis_filter=model=DetectionModel_int.onnx:confidence=0.3:ep=DML:facemodelpath='C:/Users/tianwyan/Desktop/DMLtest/weights':sourceimg='C:/Users/tianwyan/Desktop/DMLtest/faceimg/tianwei.jpg'"],
+            "-vf","vitis_filter=model=DetectionModel_int.onnx:confidence=0.3:ep=DML:facemodelpath='weights':sourceimg='faceimg/tianwei.jpg'"],
             "stopAtEntry": false,
-            "cwd": "${fileDirname}",
+            "cwd": "C:/Users/tianwyan/Desktop/DMLtest/",
             "environment": [],
             "console": "externalTerminal"
         }

@@ -1,7 +1,169 @@
 #include "utils.h"
 
+#include <d3d11.h>
+#include <d3dcompiler.h>
+
 using namespace std;
 using namespace cv;
+
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "d3dcompiler.lib")
+
+class DirectComputeWrapper
+{
+public:
+    DirectComputeWrapper();
+    ~DirectComputeWrapper();
+    bool Initialize();
+    void WarpAffine(const Mat& src, Mat& dst, const Mat& M, const Size dsize, int flags = INTER_LINEAR, int borderMode = BORDER_CONSTANT, const Scalar& borderValue = Scalar());
+
+private:
+    ID3D11Device* device;
+    ID3D11DeviceContext* context;
+    ID3D11ComputeShader* computeShader;
+    ID3D11Buffer* constantBuffer;
+    ID3D11ShaderResourceView* inputImageSRV;
+    ID3D11UnorderedAccessView* outputImageUAV;
+};
+
+DirectComputeWrapper::DirectComputeWrapper()
+    : device(nullptr), context(nullptr), computeShader(nullptr),
+    constantBuffer(nullptr), inputImageSRV(nullptr), outputImageUAV(nullptr)
+{
+}
+
+DirectComputeWrapper::~DirectComputeWrapper()
+{
+    if (constantBuffer) constantBuffer->Release();
+    if (computeShader) computeShader->Release();
+    if (context) context->Release();
+    if (device) device->Release();
+}
+
+bool DirectComputeWrapper::Initialize()
+{
+    HRESULT hr = D3D11CreateDevice(
+        nullptr,
+        D3D_DRIVER_TYPE_HARDWARE,
+        nullptr,
+        0,
+        nullptr,
+        0,
+        D3D11_SDK_VERSION,
+        &device,
+        nullptr,
+        &context);
+
+    if (FAILED(hr))
+    {
+        cerr << "Failed to create D3D11 device." << endl;
+        return false;
+    }
+
+    ID3DBlob* csBlob = nullptr;
+    hr = D3DCompileFromFile(L"WarpAffine.hlsl", nullptr, nullptr, "main", "cs_5_0", 0, 0, &csBlob, nullptr);
+    if (FAILED(hr))
+    {
+        if (csBlob){
+            OutputDebugStringA(reinterpret_cast<const char*>(csBlob->GetBufferPointer()));
+            csBlob->Release();
+        }
+        cerr << "Failed to compile compute shader, err=0x" << hr << endl;
+        return false;
+    }
+
+    hr = device->CreateComputeShader(csBlob->GetBufferPointer(), csBlob->GetBufferSize(), nullptr, &computeShader);
+    csBlob->Release();
+    if (FAILED(hr))
+    {
+        cerr << "Failed to create compute shader." << endl;
+        return false;
+    }
+
+    // 创建常量缓冲区
+    D3D11_BUFFER_DESC cbDesc = {};
+    cbDesc.Usage = D3D11_USAGE_DEFAULT;
+    cbDesc.ByteWidth = sizeof(float) * 16; // 3x3 matrix + width + height + flags + borderMode + borderValue
+    cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    hr = device->CreateBuffer(&cbDesc, nullptr, &constantBuffer);
+    if (FAILED(hr))
+    {
+        cerr << "Failed to create constant buffer." << endl;
+        return false;
+    }
+
+    return true;
+}
+
+void DirectComputeWrapper::WarpAffine(const Mat& inputImage, Mat& outputImage, const Mat& affineMatrix, Size dsize, int flags, int borderMode, const Scalar& borderValue)
+{
+    // 转换图像为 GPU 可用的格式
+    D3D11_TEXTURE2D_DESC texDesc = {};
+    texDesc.Width = inputImage.cols;
+    texDesc.Height = inputImage.rows;
+    texDesc.MipLevels = 1;
+    texDesc.ArraySize = 1;
+    texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+
+    D3D11_SUBRESOURCE_DATA initData = {};
+    initData.pSysMem = inputImage.data;
+    initData.SysMemPitch = static_cast<UINT>(inputImage.step);
+
+    ID3D11Texture2D* inputTexture = nullptr;
+    device->CreateTexture2D(&texDesc, &initData, &inputTexture);
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = texDesc.Format;
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    device->CreateShaderResourceView(inputTexture, &srvDesc, &inputImageSRV);
+
+    texDesc.Width = dsize.width;
+    texDesc.Height = dsize.height;
+    texDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+    ID3D11Texture2D* outputTexture = nullptr;
+    device->CreateTexture2D(&texDesc, nullptr, &outputTexture);
+
+    D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.Format = texDesc.Format;
+    uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+
+    device->CreateUnorderedAccessView(outputTexture, &uavDesc, &outputImageUAV);
+
+    // 设置常量缓冲区
+    float cbData[16] = {
+        affineMatrix.at<float>(0, 0), affineMatrix.at<float>(0, 1), affineMatrix.at<float>(0, 2),
+        affineMatrix.at<float>(1, 0), affineMatrix.at<float>(1, 1), affineMatrix.at<float>(1, 2),
+        0, 0, 1,
+        static_cast<float>(dsize.width),
+        static_cast<float>(dsize.height),
+        static_cast<float>(flags),
+        static_cast<float>(borderMode),
+        borderValue[0], borderValue[1], borderValue[2]
+    };
+
+    context->UpdateSubresource(constantBuffer, 0, nullptr, cbData, 0, 0);
+
+    context->CSSetShader(computeShader, nullptr, 0);
+    context->CSSetConstantBuffers(0, 1, &constantBuffer);
+    context->CSSetShaderResources(0, 1, &inputImageSRV);
+    context->CSSetUnorderedAccessViews(0, 1, &outputImageUAV, nullptr);
+
+    context->Dispatch((dsize.width + 15) / 16, (dsize.height + 15) / 16, 1);
+
+    // 读取结果
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    context->Map(outputTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
+    memcpy(outputImage.data, mappedResource.pData, outputImage.step * outputImage.rows);
+    context->Unmap(outputTexture, 0);
+
+    inputTexture->Release();
+    outputTexture->Release();
+}
 
 float GetIoU(const Bbox box1, const Bbox box2)
 {
@@ -93,14 +255,23 @@ Mat create_static_box_mask(const int *crop_size, const float face_mask_blur, con
 Mat paste_back(Mat temp_vision_frame, Mat crop_vision_frame, Mat crop_mask, Mat affine_matrix)
 {
     Mat inverse_matrix;
+    DirectComputeWrapper dcw;
+    if (!dcw.Initialize())
+    {
+        cerr << "Failed to initialize DirectCompute." << endl;
+        return inverse_matrix;
+    }
+
     cv::invertAffineTransform(affine_matrix, inverse_matrix);
     Mat inverse_mask;
     Size temp_size(temp_vision_frame.cols, temp_vision_frame.rows);
-    warpAffine(crop_mask, inverse_mask, inverse_matrix, temp_size);
+    //warpAffine(crop_mask, inverse_mask, inverse_matrix, temp_size);
+    dcw.WarpAffine(crop_mask, inverse_mask, inverse_matrix, temp_size);
     inverse_mask.setTo(0, inverse_mask < 0);
     inverse_mask.setTo(1, inverse_mask > 1);
     Mat inverse_vision_frame;
-    warpAffine(crop_vision_frame, inverse_vision_frame, inverse_matrix, temp_size, cv::INTER_LINEAR, cv::BORDER_REPLICATE);
+    //warpAffine(crop_vision_frame, inverse_vision_frame, inverse_matrix, temp_size, cv::INTER_LINEAR, cv::BORDER_REPLICATE);
+    dcw.WarpAffine(crop_vision_frame, inverse_vision_frame, inverse_matrix, temp_size, cv::INTER_LINEAR, cv::BORDER_REPLICATE);
 
     vector<Mat> inverse_vision_frame_bgrs(3);
     split(inverse_vision_frame, inverse_vision_frame_bgrs);
