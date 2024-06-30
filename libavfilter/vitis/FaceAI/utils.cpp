@@ -59,7 +59,6 @@ bool DirectComputeWrapper::Initialize()
         return false;
     }
 
-    // 创建常量缓冲区
     D3D11_BUFFER_DESC cbDesc = {};
     cbDesc.Usage = D3D11_USAGE_DEFAULT;
     cbDesc.ByteWidth = sizeof(ConstantBuffer); // 2x3 matrix + width + height + flags + borderMode + borderValue
@@ -80,7 +79,6 @@ void DirectComputeWrapper::WarpAffine(const Mat& inputImage, Mat& outputImage, c
     HRESULT hr;
     outputImage.create(dsize, inputImage.type());
     //cv::directx::convertToD3D11Texture2D(inputImage, inputTexture);
-    // 转换图像为 GPU 可用的格式
     D3D11_TEXTURE2D_DESC texDesc = {};
     texDesc.Width = inputImage.cols;
     texDesc.Height = inputImage.rows;
@@ -171,7 +169,6 @@ void DirectComputeWrapper::WarpAffine(const Mat& inputImage, Mat& outputImage, c
     context->CSSetUnorderedAccessViews(0, 1, &outputImageUAV, nullptr);
 
     context->Dispatch((dsize.width + 15) / 16, (dsize.height + 15) / 16, 1);
-    context->Flush();
 
     texDesc.BindFlags = 0;
     texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
@@ -185,7 +182,9 @@ void DirectComputeWrapper::WarpAffine(const Mat& inputImage, Mat& outputImage, c
     }
     context->CopyResource(stagingTexture, outputTexture);
 
-    // 读取结果
+    //context->Flush();
+
+    // read from texture
     D3D11_MAPPED_SUBRESOURCE mappedResource;
     hr = context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
     if (FAILED(hr))
@@ -352,8 +351,8 @@ Mat paste_back(Mat temp_vision_frame, Mat crop_vision_frame, Mat crop_mask, Mat 
     inverse_mask = inverse_vision_frame_bgrs[3];
 
     //inverse_mask.convertTo(inverse_mask,CV_8UC1);
-    inverse_mask.setTo(0, inverse_mask < 0);
-    inverse_mask.setTo(1, inverse_mask > 1);
+    /* inverse_mask.setTo(0, inverse_mask < 0);
+    inverse_mask.setTo(1, inverse_mask > 1);  clamped in shader*/
     /* cv::invertAffineTransform(affine_matrix, inverse_matrix);
     Mat inverse_mask; 
     Size temp_size(temp_vision_frame.cols, temp_vision_frame.rows);
@@ -383,9 +382,9 @@ Mat paste_back(Mat temp_vision_frame, Mat crop_vision_frame, Mat crop_mask, Mat 
     cv::Mat paste_vision_frame;
     merge(channel_mats, paste_vision_frame);
     paste_vision_frame.convertTo(paste_vision_frame, CV_8UC3);
-    inverse_mask.release();
+    //inverse_mask.release();
     //inverse_matrix.release();
-    inverse_vision_frame.release();
+    //inverse_vision_frame.release();
     //imshow("pasted",paste_vision_frame);
     return paste_vision_frame;
 }

@@ -1,12 +1,14 @@
 // WarpAffine.hlsl
 cbuffer ConstantBuffer : register(b0)
 {
-    float3x2 affineMatrix;
-    uint width;
-    uint height;
-    uint flags;
-    uint borderMode;
+    float width;
+    float height;
+    float flags;
+    float borderMode;
     float4 borderValue;
+    float3x2 affineMatrix;
+    float srcwidth;
+    float srcheight;
 };
 
 Texture2D<float4> srcImage : register(t0);
@@ -32,27 +34,28 @@ float4 sampleBilinear(Texture2D<float4> srcimg, float2 texCoord)
     return lerp(lerp(c00, c10, blend.x), lerp(c01, c11, blend.x), blend.y);
 }
 
-[numthreads(16, 16, 4)]
+[numthreads(16, 16, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-    // dstImage[DTid.xy] =float4(0.5,0.5,0.5,0.5);
-
-    // return;
-
+    //dstImage[DTid.xy] = affineMatrix._31_12_22_32;
+    //dstImage[DTid.xy] = affineMatrix._11_21_31_12;
+    //dstImage[DTid.xy] = float4(128,512,srcwidth,srcheight);
+    //return;
     if (DTid.x >= width || DTid.y >= height)
     {
-        //dstImage[DTid.xy] =float4(1.0,0.5,1.5,0.5);
-        //dstImage[DTid.xy] = float4(width,height,x,y)
         return;
     }
         
 
-    float3 pos = float3(DTid.xy, 1.0);
+    float3 pos = float3(DTid.x, DTid.y, 1.0);
     float2 newPos = mul(pos, affineMatrix);
+    //newPos = newPos + {width/2,height/2};
+    //newPos.x = DTid.x * affineMatrix._11 + DTid.y * affineMatrix._21 + affineMatrix._31;
+    //newPos.y = DTid.x * affineMatrix._12 + DTid.y * affineMatrix._22 + affineMatrix._32;
     
     float4 color;
 
-    if (newPos.x < 0 || newPos.y < 0 || newPos.x >= width || newPos.y >= height)
+    if (newPos.x < 0 || newPos.y < 0 || newPos.x >= srcwidth || newPos.y >= srcheight)
     {
         if (borderMode == 0) // BORDER_CONSTANT
         {
@@ -60,8 +63,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
         }
         else if (borderMode == 1) // BORDER_REPLICATE
         {
-            newPos.x = clamp(newPos.x, 0, width - 1);
-            newPos.y = clamp(newPos.y, 0, height - 1);
+            newPos.x = clamp(newPos.x, 0, srcwidth - 1);
+            newPos.y = clamp(newPos.y, 0, srcheight - 1);
             color = srcImage.SampleLevel(samLinear, newPos, 0);
         }
     }
@@ -70,14 +73,19 @@ void main(uint3 DTid : SV_DispatchThreadID)
         if (flags == 0) // INTER_NEAREST
         {
             newPos = floor(newPos + 0.5);
-            color = srcImage.SampleLevel(samLinear, newPos / float2(width, height), 0);
+            color = srcImage.SampleLevel(samLinear, newPos / float2(srcwidth, srcheight), 0);
         }
         else if (flags == 1) // INTER_LINEAR
         {
-            color = sampleBilinear(srcImage, newPos / float2(width, height));
+            color = sampleBilinear(srcImage, newPos / float2(srcwidth, srcheight));
         }
         // Add other interpolation methods if needed
     }
+
+    if (color.a < 0)
+        color.a = 0;
+    if (color.a > 1)
+        color.a = 1;
 
     dstImage[DTid.xy] = color;
 }
