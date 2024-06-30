@@ -166,6 +166,7 @@ int faceswap_onnx::faceswap_process(cv::Mat& target_img)
 
 	Mat swapimg = swap_face_net->process(target_img, source_face_embedding, target_landmark_5);
 	//Mat resultimg = enhance_face_net->process(swapimg, target_landmark_5);
+    //return swapimg;
 	target_img = enhance_face_net->process(swapimg, target_landmark_5);
 
     return 0;

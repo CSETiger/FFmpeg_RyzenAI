@@ -1,34 +1,13 @@
 #include "utils.h"
 
-#include <d3d11.h>
-#include <d3dcompiler.h>
-
 using namespace std;
 using namespace cv;
 
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "d3dcompiler.lib")
-
-class DirectComputeWrapper
-{
-public:
-    DirectComputeWrapper();
-    ~DirectComputeWrapper();
-    bool Initialize();
-    void WarpAffine(const Mat& src, Mat& dst, const Mat& M, const Size dsize, int flags = INTER_LINEAR, int borderMode = BORDER_CONSTANT, const Scalar& borderValue = Scalar());
-
-private:
-    ID3D11Device* device;
-    ID3D11DeviceContext* context;
-    ID3D11ComputeShader* computeShader;
-    ID3D11Buffer* constantBuffer;
-    ID3D11ShaderResourceView* inputImageSRV;
-    ID3D11UnorderedAccessView* outputImageUAV;
-};
+DirectComputeWrapper dcw;
 
 DirectComputeWrapper::DirectComputeWrapper()
     : device(nullptr), context(nullptr), computeShader(nullptr),
-    constantBuffer(nullptr), inputImageSRV(nullptr), outputImageUAV(nullptr)
+    constantBuffer(nullptr), inputImageSRV(nullptr), outputImageUAV(nullptr), DC_init(false)
 {
 }
 
@@ -83,69 +62,107 @@ bool DirectComputeWrapper::Initialize()
     // 创建常量缓冲区
     D3D11_BUFFER_DESC cbDesc = {};
     cbDesc.Usage = D3D11_USAGE_DEFAULT;
-    cbDesc.ByteWidth = sizeof(float) * 16; // 3x3 matrix + width + height + flags + borderMode + borderValue
+    cbDesc.ByteWidth = sizeof(ConstantBuffer); // 2x3 matrix + width + height + flags + borderMode + borderValue
     cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     hr = device->CreateBuffer(&cbDesc, nullptr, &constantBuffer);
     if (FAILED(hr))
     {
-        cerr << "Failed to create constant buffer." << endl;
+        cerr << "Failed to create constant buffer err=0x" << hr << endl;
         return false;
     }
 
-    return true;
+    return DC_init = true;
 }
 
 void DirectComputeWrapper::WarpAffine(const Mat& inputImage, Mat& outputImage, const Mat& affineMatrix, Size dsize, int flags, int borderMode, const Scalar& borderValue)
 {
+    //cout << "affineMatrix" << affineMatrix << "\n";
+    HRESULT hr;
+    outputImage.create(dsize, inputImage.type());
+    //cv::directx::convertToD3D11Texture2D(inputImage, inputTexture);
     // 转换图像为 GPU 可用的格式
     D3D11_TEXTURE2D_DESC texDesc = {};
     texDesc.Width = inputImage.cols;
     texDesc.Height = inputImage.rows;
     texDesc.MipLevels = 1;
     texDesc.ArraySize = 1;
-    texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    //texDesc.Format = DXGI_FORMAT_FORCE_UINT;
     texDesc.SampleDesc.Count = 1;
     texDesc.Usage = D3D11_USAGE_DEFAULT;
     texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+    texDesc.SampleDesc.Quality = 0;
 
     D3D11_SUBRESOURCE_DATA initData = {};
     initData.pSysMem = inputImage.data;
     initData.SysMemPitch = static_cast<UINT>(inputImage.step);
 
     ID3D11Texture2D* inputTexture = nullptr;
-    device->CreateTexture2D(&texDesc, &initData, &inputTexture);
+    hr = device->CreateTexture2D(&texDesc, &initData, &inputTexture);
+    if (FAILED(hr))
+    {
+        cerr << "CreateTexture2D inputtexture failed, err=0x" << hr << endl;
+        return;
+    }
+    //cv::directx::convertToD3D11Texture2D(inputImage, inputTexture);
 
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Format = texDesc.Format;
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = 1;
 
-    device->CreateShaderResourceView(inputTexture, &srvDesc, &inputImageSRV);
+    hr = device->CreateShaderResourceView(inputTexture, &srvDesc, &inputImageSRV);
+    if (FAILED(hr))
+    {
+        cerr << "CreateShaderResourceView inputImageSRV failed, err=0x" << hr << endl;
+        return;
+    }
 
     texDesc.Width = dsize.width;
     texDesc.Height = dsize.height;
     texDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+    //texDesc.BindFlags = 0;
+    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    //texDesc.Usage = D3D11_USAGE_STAGING;
     ID3D11Texture2D* outputTexture = nullptr;
-    device->CreateTexture2D(&texDesc, nullptr, &outputTexture);
+    hr = device->CreateTexture2D(&texDesc, nullptr, &outputTexture);
+    if (FAILED(hr))
+    {
+        cerr << "CreateTexture2D outputTexture failed, err=0x" << hr << endl;
+        return;
+    }
 
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     uavDesc.Format = texDesc.Format;
     uavDesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
 
-    device->CreateUnorderedAccessView(outputTexture, &uavDesc, &outputImageUAV);
-
-    // 设置常量缓冲区
-    float cbData[16] = {
-        affineMatrix.at<float>(0, 0), affineMatrix.at<float>(0, 1), affineMatrix.at<float>(0, 2),
-        affineMatrix.at<float>(1, 0), affineMatrix.at<float>(1, 1), affineMatrix.at<float>(1, 2),
-        0, 0, 1,
+    hr = device->CreateUnorderedAccessView(outputTexture, &uavDesc, &outputImageUAV);
+    if (FAILED(hr))
+    {
+        cerr << "CreateUnorderedAccessView outputImageUAV failed, err=0x" << hr << endl;
+        return;
+    }
+    //cout << "affineMatrix to cb data" << affineMatrix << "\n";
+    // set constant buffer
+    float cbData[19] = {
         static_cast<float>(dsize.width),
         static_cast<float>(dsize.height),
         static_cast<float>(flags),
         static_cast<float>(borderMode),
-        borderValue[0], borderValue[1], borderValue[2]
+        borderValue[0], borderValue[1], borderValue[2], borderValue[3],
+        // affineMatrix.at<float>(0, 0), affineMatrix.at<float>(0, 1), affineMatrix.at<float>(0, 2),0,
+        // affineMatrix.at<float>(1, 0), affineMatrix.at<float>(1, 1), affineMatrix.at<float>(1, 2),0,
+        affineMatrix.at<double>(0, 0), affineMatrix.at<double>(0, 1), affineMatrix.at<double>(0, 2),0,
+        affineMatrix.at<double>(1, 0), affineMatrix.at<double>(1, 1), affineMatrix.at<double>(1, 2),
+        // affineMatrix.at<float>(0, 0), affineMatrix.at<float>(1, 0),
+        // affineMatrix.at<float>(0, 1), affineMatrix.at<float>(1, 1),
+        // affineMatrix.at<float>(0, 2), affineMatrix.at<float>(1, 2),
+        static_cast<float>(inputImage.cols), static_cast<float>(inputImage.rows), 0, 0,
     };
-
+    // cout << "cbData [";
+    // for (int i=0; i<18; i++)
+    //     cout << cbData[i] << " ";
+    // cout << "\n";
     context->UpdateSubresource(constantBuffer, 0, nullptr, cbData, 0, 0);
 
     context->CSSetShader(computeShader, nullptr, 0);
@@ -154,15 +171,40 @@ void DirectComputeWrapper::WarpAffine(const Mat& inputImage, Mat& outputImage, c
     context->CSSetUnorderedAccessViews(0, 1, &outputImageUAV, nullptr);
 
     context->Dispatch((dsize.width + 15) / 16, (dsize.height + 15) / 16, 1);
+    context->Flush();
+
+    texDesc.BindFlags = 0;
+    texDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    texDesc.Usage = D3D11_USAGE_STAGING;
+    ID3D11Texture2D* stagingTexture = nullptr;
+    hr = device->CreateTexture2D(&texDesc, nullptr, &stagingTexture);
+    if (FAILED(hr))
+    {
+        cerr << "CreateTexture2D stagingTexture failed, err=0x" << hr << endl;
+        return;
+    }
+    context->CopyResource(stagingTexture, outputTexture);
 
     // 读取结果
     D3D11_MAPPED_SUBRESOURCE mappedResource;
-    context->Map(outputTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
-    memcpy(outputImage.data, mappedResource.pData, outputImage.step * outputImage.rows);
-    context->Unmap(outputTexture, 0);
+    hr = context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
+    if (FAILED(hr))
+    {
+        cerr << "Failed to map texture, err=0x" << hr << endl;
+    }
+    else{
+        //memcpy(outputImage.data, mappedResource.pData, mappedResource.RowPitch);
+        memcpy(outputImage.data, mappedResource.pData, outputImage.step * outputImage.rows);
+        //memcpy(outputImage.data, mappedResource.pData, dsize.width * dsize.height);
+        //cv::directx::convertFromD3D11Texture2D(stagingTexture,outputImage);
+        context->Unmap(stagingTexture, 0);
+    }
 
     inputTexture->Release();
     outputTexture->Release();
+    stagingTexture->Release();
+    inputImageSRV->Release();
+    outputImageUAV->Release();
 }
 
 float GetIoU(const Bbox box1, const Bbox box2)
@@ -222,6 +264,11 @@ Mat warp_face_by_face_landmark_5(const Mat temp_vision_frame, Mat &crop_img, con
 {
     vector<uchar> inliers(face_landmark_5.size(), 0);
     Mat affine_matrix = cv::estimateAffinePartial2D(face_landmark_5, normed_template, cv::noArray(), cv::RANSAC, 100.0);
+    // std::cout << "face_landmark_5:" << face_landmark_5 << endl;
+    // std::cout << "normed_template:" << normed_template << endl;
+    // std::cout << "cal_affine_matrix:" << affine_matrix << endl;
+    // std::cout << "cal_landmark: " << face_landmark_5[0].x * affine_matrix.at<double>(0,0) + face_landmark_5[0].y * affine_matrix.at<double>(0,1) + affine_matrix.at<double>(0,2) << ",  " << face_landmark_5[0].x * affine_matrix.at<double>(1,0) + face_landmark_5[0].y * affine_matrix.at<double>(1,1) + affine_matrix.at<double>(1,2) << endl;
+    // std::cout << "cal_landmark: " << face_landmark_5[1].x * affine_matrix.at<double>(0,0) + face_landmark_5[1].y * affine_matrix.at<double>(0,1) + affine_matrix.at<double>(0,2) << ",  " << face_landmark_5[1].x * affine_matrix.at<double>(1,0) + face_landmark_5[1].y * affine_matrix.at<double>(1,1) + affine_matrix.at<double>(1,2) << endl;
     warpAffine(temp_vision_frame, crop_img, affine_matrix, crop_size, cv::INTER_AREA, cv::BORDER_REPLICATE);
     return affine_matrix;
 }
@@ -254,27 +301,72 @@ Mat create_static_box_mask(const int *crop_size, const float face_mask_blur, con
 
 Mat paste_back(Mat temp_vision_frame, Mat crop_vision_frame, Mat crop_mask, Mat affine_matrix)
 {
-    Mat inverse_matrix;
-    DirectComputeWrapper dcw;
-    if (!dcw.Initialize())
-    {
-        cerr << "Failed to initialize DirectCompute." << endl;
-        return inverse_matrix;
+    //imshow("temp",temp_vision_frame);
+    //imshow("crop",crop_vision_frame);
+    //Mat inverse_matrix;
+    if (!dcw.DC_init){ //initialize only one time
+        if (!dcw.Initialize())
+        {
+            cerr << "Failed to initialize DirectCompute." << endl;
+            return temp_vision_frame;
+        }
     }
 
-    cv::invertAffineTransform(affine_matrix, inverse_matrix);
-    Mat inverse_mask;
+    /* int channels =0;
+    channels = temp_vision_frame.channels();
+    printf("temp_vision_frame channels=%d, depth=%d\n",channels, temp_vision_frame.depth());
+    channels = crop_vision_frame.channels();
+    printf("crop_vision_frame channels=%d, depth=%d\n",channels, crop_vision_frame.depth());
+    channels = crop_mask.channels();
+    printf("crop_mask channels=%d, depth=%d\n",channels, crop_mask.depth()); */
+    vector<Mat> channels_crop_vision_data(2);
+    Mat temp_crop_vision_mixed;
+    channels_crop_vision_data[0] = crop_vision_frame;
+    channels_crop_vision_data[1] = crop_mask;
+    //split(crop_vision_frame, channels_crop_vision_data);
+    //channels_crop_vision_data.push_back(crop_mask);
+    
+    try {
+        merge(channels_crop_vision_data, temp_crop_vision_mixed);
+ //read_imgList(imgList, images);
+    } catch (const cv::Exception& e) {
+        cerr << "Error merge mat. Reason: " << e.msg << endl;
+        return temp_vision_frame;
+    }
+    //printf("temp_crop_vision_mixed channels=%d\n",temp_crop_vision_mixed.channels());
+    //return temp_vision_frame;
+    //temp_crop_vision_mixed.release();
+
+    //cv::invertAffineTransform(affine_matrix, inverse_matrix);
+    //cout << "affine_matrix" << affine_matrix << "\n";
+    //cout << "inverse_matrix" << inverse_matrix << inverse_matrix.type() << "\n";
     Size temp_size(temp_vision_frame.cols, temp_vision_frame.rows);
-    //warpAffine(crop_mask, inverse_mask, inverse_matrix, temp_size);
-    dcw.WarpAffine(crop_mask, inverse_mask, inverse_matrix, temp_size);
+    Mat inverse_temp_mixed;
+    //dcw.WarpAffine(temp_crop_vision_mixed, inverse_temp_mixed, inverse_matrix, temp_size);
+    dcw.WarpAffine(temp_crop_vision_mixed, inverse_temp_mixed, affine_matrix, temp_size);
+
+    Mat inverse_mask;
+    Mat inverse_vision_frame; 
+    vector<Mat> inverse_vision_frame_bgrs(4);
+    split(inverse_temp_mixed, inverse_vision_frame_bgrs);
+    inverse_mask = inverse_vision_frame_bgrs[3];
+
+    //inverse_mask.convertTo(inverse_mask,CV_8UC1);
+    inverse_mask.setTo(0, inverse_mask < 0);
+    inverse_mask.setTo(1, inverse_mask > 1);
+    /* cv::invertAffineTransform(affine_matrix, inverse_matrix);
+    Mat inverse_mask; 
+    Size temp_size(temp_vision_frame.cols, temp_vision_frame.rows);
+    warpAffine(crop_mask, inverse_mask, inverse_matrix, temp_size);
+    //dcw.WarpAffine(crop_mask, inverse_mask, inverse_matrix, temp_size);
     inverse_mask.setTo(0, inverse_mask < 0);
     inverse_mask.setTo(1, inverse_mask > 1);
     Mat inverse_vision_frame;
-    //warpAffine(crop_vision_frame, inverse_vision_frame, inverse_matrix, temp_size, cv::INTER_LINEAR, cv::BORDER_REPLICATE);
-    dcw.WarpAffine(crop_vision_frame, inverse_vision_frame, inverse_matrix, temp_size, cv::INTER_LINEAR, cv::BORDER_REPLICATE);
+    warpAffine(crop_vision_frame, inverse_vision_frame, inverse_matrix, temp_size, cv::INTER_LINEAR, cv::BORDER_REPLICATE);
+    //dcw.WarpAffine(crop_vision_frame, inverse_vision_frame, inverse_matrix, temp_size, cv::INTER_LINEAR, cv::BORDER_REPLICATE); */
 
-    vector<Mat> inverse_vision_frame_bgrs(3);
-    split(inverse_vision_frame, inverse_vision_frame_bgrs);
+    //vector<Mat> inverse_vision_frame_bgrs(3);
+    //split(inverse_vision_frame, inverse_vision_frame_bgrs);
     vector<Mat> temp_vision_frame_bgrs(3);
     split(temp_vision_frame, temp_vision_frame_bgrs);
     for (int c = 0; c < 3; c++)
@@ -291,6 +383,10 @@ Mat paste_back(Mat temp_vision_frame, Mat crop_vision_frame, Mat crop_mask, Mat 
     cv::Mat paste_vision_frame;
     merge(channel_mats, paste_vision_frame);
     paste_vision_frame.convertTo(paste_vision_frame, CV_8UC3);
+    inverse_mask.release();
+    //inverse_matrix.release();
+    inverse_vision_frame.release();
+    //imshow("pasted",paste_vision_frame);
     return paste_vision_frame;
 }
 

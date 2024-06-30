@@ -1,84 +1,83 @@
-cbuffer Constants : register(b0)
+// WarpAffine.hlsl
+cbuffer ConstantBuffer : register(b0)
 {
-    float3x3 affineMatrix;
-    float width;
-    float height;
-    float flags;
-    float borderMode;
-    float3 borderValue;
+    float3x2 affineMatrix;
+    uint width;
+    uint height;
+    uint flags;
+    uint borderMode;
+    float4 borderValue;
 };
 
-Texture2D<float4> inputImage : register(t0);
-RWTexture2D<float4> outputImage : register(u0);
+Texture2D<float4> srcImage : register(t0);
+RWTexture2D<float4> dstImage : register(u0);
 
-float4 getBorderValue(float3 borderValue, float borderMode)
+SamplerState samLinear : register(s0);
+
+float4 sampleBilinear(Texture2D<float4> srcimg, float2 texCoord)
 {
-    if (borderMode == 0) // BORDER_CONSTANT
-    {
-        return float4(borderValue, 1.0);
-    }
-    // Other border modes can be implemented here
-    return float4(0, 0, 0, 0);
+    float2 texSize;
+    srcimg.GetDimensions(texSize.x, texSize.y);
+
+    float2 texelSize = 1.0 / texSize;
+    float2 texelCoord = texCoord * texSize - 0.5;
+    float2 blend = frac(texelCoord);
+    texelCoord = floor(texelCoord);
+
+    float4 c00 = srcimg.SampleLevel(samLinear, texelCoord * texelSize, 0);
+    float4 c10 = srcimg.SampleLevel(samLinear, (texelCoord + float2(1, 0)) * texelSize, 0);
+    float4 c01 = srcimg.SampleLevel(samLinear, (texelCoord + float2(0, 1)) * texelSize, 0);
+    float4 c11 = srcimg.SampleLevel(samLinear, (texelCoord + float2(1, 1)) * texelSize, 0);
+
+    return lerp(lerp(c00, c10, blend.x), lerp(c01, c11, blend.x), blend.y);
 }
 
-float2 replicateBorder(float2 pos, float width, float height)
-{
-    pos.x = clamp(pos.x, 0.0, width - 1.0);
-    pos.y = clamp(pos.y, 0.0, height - 1.0);
-    return pos;
-}
-
-[numthreads(16, 16, 1)]
+[numthreads(16, 16, 4)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
-    int x = DTid.x;
-    int y = DTid.y;
+    // dstImage[DTid.xy] =float4(0.5,0.5,0.5,0.5);
 
-    if (x >= width || y >= height)
+    // return;
+
+    if (DTid.x >= width || DTid.y >= height)
+    {
+        //dstImage[DTid.xy] =float4(1.0,0.5,1.5,0.5);
+        //dstImage[DTid.xy] = float4(width,height,x,y)
         return;
+    }
+        
 
-    float3 pos = float3(x, y, 1);
-    float3 newPos = mul(affineMatrix, pos);
-    float2 pos2D = newPos.xy;
-
+    float3 pos = float3(DTid.xy, 1.0);
+    float2 newPos = mul(pos, affineMatrix);
+    
     float4 color;
 
-    if (newPos.x < 0 || newPos.x >= width || newPos.y < 0 || newPos.y >= height)
+    if (newPos.x < 0 || newPos.y < 0 || newPos.x >= width || newPos.y >= height)
     {
-        if (borderMode == 1) // BORDER_REPLICATE
+        if (borderMode == 0) // BORDER_CONSTANT
         {
-            pos2D = replicateBorder(pos2D, width, height);
-            color = inputImage.Load(int3(pos2D, 0));
+            color = borderValue;
         }
-        else
+        else if (borderMode == 1) // BORDER_REPLICATE
         {
-            color = getBorderValue(borderValue, borderMode);
+            newPos.x = clamp(newPos.x, 0, width - 1);
+            newPos.y = clamp(newPos.y, 0, height - 1);
+            color = srcImage.SampleLevel(samLinear, newPos, 0);
         }
     }
     else
     {
         if (flags == 0) // INTER_NEAREST
         {
-            int2 nearestPos = int2(round(pos2D));
-            color = inputImage.Load(int3(nearestPos, 0));
+            newPos = floor(newPos + 0.5);
+            color = srcImage.SampleLevel(samLinear, newPos / float2(width, height), 0);
         }
         else if (flags == 1) // INTER_LINEAR
         {
-            float2 frac = float2(pos2D);
-            int2 p1 = int2(floor(pos2D));
-            int2 p2 = p1 + int2(1, 0);
-            int2 p3 = p1 + int2(0, 1);
-            int2 p4 = p1 + int2(1, 1);
-
-            float4 c1 = inputImage.Load(int3(p1, 0));
-            float4 c2 = inputImage.Load(int3(p2, 0));
-            float4 c3 = inputImage.Load(int3(p3, 0));
-            float4 c4 = inputImage.Load(int3(p4, 0));
-
-            color = lerp(lerp(c1, c2, frac.x), lerp(c3, c4, frac.x), frac.y);
+            color = sampleBilinear(srcImage, newPos / float2(width, height));
         }
-        // Additional interpolation methods can be implemented here
+        // Add other interpolation methods if needed
     }
 
-    outputImage[DTid.xy] = color;
+    dstImage[DTid.xy] = color;
 }

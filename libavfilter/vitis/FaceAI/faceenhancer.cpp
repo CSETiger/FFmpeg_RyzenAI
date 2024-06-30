@@ -151,7 +151,7 @@ Mat FaceEnhance::process(Mat target_img, const vector<Point2f> target_landmark_5
 	channel_mats[2] = rmat;
     Mat result;
 	merge(channel_mats, result);
-	result.convertTo(result, CV_8UC3);
+	//result.convertTo(result, CV_8UC3); //keep depth
 
     box_mask.setTo(0, box_mask < 0);
 	box_mask.setTo(1, box_mask > 1);
